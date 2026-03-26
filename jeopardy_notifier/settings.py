@@ -11,21 +11,30 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 from pathlib import Path
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load environment variables from .env.local for development
+# This should be at the top to ensure all settings are loaded correctly
+try:
+    from dotenv import load_dotenv
+    load_dotenv(BASE_DIR / '.env.local')
+except ImportError:
+    pass
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-hixbao(2&%6ib@d)qsp4=*dgc!$zu2e8#lkoo#h!g!i48d)w#9'
+SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-hixbao(2&%6ib@d)qsp4=*dgc!$zu2e8#lkoo#h!g!i48d)w#9')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
 
 # Application definition
@@ -38,6 +47,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'core',
+    'turnstile',
 ]
 
 MIDDLEWARE = [
@@ -119,7 +129,6 @@ STATIC_URL = 'static/'
 
 # Mailgun Configuration
 # Set these via environment variables for security
-import os
 MAILGUN_API_KEY = os.getenv('MAILGUN_API_KEY', '')
 MAILGUN_DOMAIN = os.getenv('MAILGUN_DOMAIN', '')
 MAILGUN_FROM_EMAIL = os.getenv('MAILGUN_FROM_EMAIL', 'no-reply@jeopardy-notifier.example.com')
@@ -128,19 +137,9 @@ MAILGUN_FROM_EMAIL = os.getenv('MAILGUN_FROM_EMAIL', 'no-reply@jeopardy-notifier
 # Set these via environment variables for security
 TURNSTILE_SITE_KEY = os.getenv('TURNSTILE_SITE_KEY', '')
 TURNSTILE_SECRET_KEY = os.getenv('TURNSTILE_SECRET_KEY', '')
-REQUIRE_TURNSTILE = os.getenv('REQUIRE_TURNSTILE', 'False').lower() == 'true'
 
-# Below are settings for development testing - these should be removed or overridden in production
 if DEBUG:
-    # Load environment variables from .env.local for development
-    try:
-        from dotenv import load_dotenv
-        load_dotenv('.env.local')
-    except ImportError:
-        pass
-
-    # Then update these settings:
-    DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
-    SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-dev-key')
-    ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
-# Remove above test settings when done with development testing and ensure proper environment variables are set in production
+    print("--- Environment Variables ---")
+    for key, value in os.environ.items():
+        print(f"{key}={value}")
+    print("--------------------------")
