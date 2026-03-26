@@ -82,17 +82,19 @@ def send_emails_view(request):
     custom_message = request.session.get('custom_message', '')
     
     # Prepare email template body
+    default_custom = (
+        "We have some unfilled jeopardy shifts in the next few weeks, "
+        "please login to Qgenda and consider signing up if you are available."
+    )
+    effective_message = custom_message.strip() if custom_message.strip() else default_custom
+
     email_template = (
         "Hello {first_name},\n\n"
-        "We have some unfilled jeopardy shifts in the next few weeks, please login to Qgenda and consider signing up if you are available. "
-        "Here is your current ranking:\n\n"
+        f"{effective_message}\n\n"
+        "Here is your current ranking for recent jeopardy shifts worked:\n\n"
         "<employee ranking>\n"
+        "\nThanks,\nMCH Hospital Medicine"
     )
-    
-    if custom_message:
-        email_template += f"\n{custom_message}\n"
-    
-    email_template += "\nThanks,\nMCH Hospital Medicine"
     
     # Send emails via Mailgun
     mailgun = MailgunService()
