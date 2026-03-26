@@ -146,9 +146,11 @@
                 <p class="help-text">This is the message that will be sent to each employee in the body of the email.</p>
             </div>
             
+            {% if turnstile_site_key %}
             <div class="form-group turnstile-container">
-                {{ form.turnstile }}
+                {% include "core/widgets/turnstile.html" %}
             </div>
+            {% endif %}
             
             <button type="submit" id="submit-btn">Upload and Rank</button>
         </form>

@@ -24,16 +24,26 @@ def upload_view(request):
             request.session['ranked_data'] = ranked_df.to_json(orient='split')
             request.session['custom_message'] = form.cleaned_data['custom_message']
 
+            # Mark the request as human-verified (or always true if Turnstile not required)
+            if getattr(settings, 'REQUIRE_TURNSTILE', False):
+                request.session['human_verified'] = True
+            else:
+                request.session['human_verified'] = True
+
             return redirect('verification')
     else:
         form = UploadForm()
     
     context = {
         'form': form,
+        'turnstile_site_key': getattr(settings, 'TURNSTILE_SITE_KEY', '')
     }
     return render(request, 'core/upload.html', context)
 
 def verification_view(request):
+    if getattr(settings, 'REQUIRE_TURNSTILE', False) and not request.session.get('human_verified'):
+        return redirect('upload')
+
     ranked_data_json = request.session.get('ranked_data')
     if not ranked_data_json:
         return redirect('upload')
@@ -78,6 +88,9 @@ def verification_view(request):
 
 def send_emails_view(request):
     """Send notification emails to all ranked employees."""
+    if getattr(settings, 'REQUIRE_TURNSTILE', False) and not request.session.get('human_verified'):
+        return redirect('upload')
+
     ranked_data_json = request.session.get('ranked_data')
     if not ranked_data_json:
         return redirect('upload')
@@ -150,6 +163,9 @@ def send_emails_view(request):
 
 def confirmation_view(request):
     """Show confirmation that emails have been sent and data has been cleared."""
+    if getattr(settings, 'REQUIRE_TURNSTILE', False) and not request.session.get('human_verified'):
+        return redirect('upload')
+
     email_count = request.session.get('email_count', 0)
     
     # Clear session after displaying
