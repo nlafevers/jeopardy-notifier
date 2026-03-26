@@ -1,0 +1,65 @@
+# Python
+*.pyc
+__pycache__/
+*.egg-info/
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg
+*.whl
+
+# Virtual environments
+venv/
+env/
+.venv/
+.env.local
+
+# Django
+*.log
+*.sqlite3
+db.sqlite3
+media/
+static_cdn/
+local_settings.py
+.env
+
+# IDEs and editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Testing and coverage
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+.hypothesis/
+
+# PyInstaller
+*.manifest
+*.spec
+
+# IPython Notebook
+.ipynb_checkpoints
+
+# Celery beat schedule file
+celerybeat-schedule
+
+# Pyenv
+.python-version

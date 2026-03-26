@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirmation - Jeopardy Notifier</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        h1 {
+            color: #28a745;
+            margin-bottom: 20px;
+        }
+        .success-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+        p {
+            color: #555;
+            line-height: 1.6;
+            margin: 15px 0;
+        }
+        .highlight {
+            font-weight: bold;
+            color: #333;
+        }
+        .button {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 12px 30px;
+            background-color: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+        .button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="success-icon">✓</div>
+        <h1>Emails Sent Successfully!</h1>
+        
+        <p>
+            All notification emails have been sent to the employees.
+        </p>
+        
+        <p>
+            <span class="highlight">{{ email_count }}</span> employee(s) received their individual ranking notifications.
+        </p>
+        
+        <p>
+            <strong>Privacy Notice:</strong> All user-submitted information including spreadsheets and custom messages have been permanently removed from our system.
+        </p>
+        
+        <a href="{% url 'upload' %}" class="button">Send Another Report</a>
+    </div>
+</body>
+</html>

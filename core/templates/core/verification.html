@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Rankings - Jeopardy Notifier</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+        }
+        .warning {
+            background-color: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 4px;
+            padding: 12px;
+            margin-bottom: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #007bff;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        tr:hover {
+            background-color: #f0f0f0;
+        }
+        .zero-hours {
+            background-color: #ffe6e6;
+        }
+        .buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .btn-back {
+            background-color: #6c757d;
+            color: white;
+        }
+        .btn-back:hover {
+            background-color: #5a6268;
+        }
+        .btn-send {
+            background-color: #28a745;
+            color: white;
+        }
+        .btn-send:hover {
+            background-color: #218838;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Verify Rankings</h1>
+        
+        {% if flagged_employees %}
+        <div class="warning">
+            <strong>⚠️ Warning:</strong> {{ flagged_employees|length }} employee(s) have 0 hours in the selected assignment and are flagged below.
+        </div>
+        {% endif %}
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Rank</th>
+                    <th>Name</th>
+                    <th>Hours</th>
+                    <th>FTE</th>
+                    <th>Score (Hours/FTE)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for employee in ranked_employees %}
+                <tr {% if employee.Hours == 0 %}class="zero-hours"{% endif %}>
+                    <td>{{ employee.Rank }}</td>
+                    <td>{{ employee.First }} {{ employee.Last }}</td>
+                    <td>{{ employee.Hours }}</td>
+                    <td>{{ employee.FTE }}</td>
+                    <td>{{ employee.Score|floatformat:2 }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        <div class="buttons">
+            <form method="get" action="{% url 'upload' %}" style="margin: 0;">
+                <button type="submit" class="btn-back">← Back and Edit</button>
+            </form>
+            <form method="post" action="{% url 'send_emails' %}" style="margin: 0;">
+                {% csrf_token %}
+                <button type="submit" class="btn-send">Send Emails →</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>
