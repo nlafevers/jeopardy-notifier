@@ -116,7 +116,7 @@
                 {% if form.hours_report.errors %}
                     <div class="error">{{ form.hours_report.errors }}</div>
                 {% endif %}
-                <p class="help-text">Upload the Excel spreadsheet with employee hours data (e.g., from Qgenda)</p>
+                <p class="help-text">Upload the Excel spreadsheet with employee hours data.<br>Qgenda > Stats > Report: Grid by Staff Detail<br>Leave all settings default, but adjust the date range if needed.</p>
             </div>
             
             <div class="form-group">
@@ -125,7 +125,7 @@
                 {% if form.roster.errors %}
                     <div class="error">{{ form.roster.errors }}</div>
                 {% endif %}
-                <p class="help-text">Upload the Excel spreadsheet with employee information (names, emails, FTE)</p>
+                <p class="help-text">Upload the Excel spreadsheet with employee information.<br>Expected column headings and order:<br>Qgenda Name | First Name | Last Name | Email Addresses | FTE </p>
             </div>
             
             <div class="form-group">
@@ -134,7 +134,7 @@
                 {% if form.assignment.errors %}
                     <div class="error">{{ form.assignment.errors }}</div>
                 {% endif %}
-                <p class="help-text">Enter the assignment name to rank employees by. Default is "Jeopardy 7a-7a"</p>
+                <p class="help-text">Enter the assignment by which to rank employees.<br>It must match the name used in Qgenda exactly.</p>
             </div>
             
             <div class="form-group">
@@ -143,7 +143,7 @@
                 {% if form.custom_message.errors %}
                     <div class="error">{{ form.custom_message.errors }}</div>
                 {% endif %}
-                <p class="help-text">Optional: Add a custom message to include in the notification emails</p>
+                <p class="help-text">This is the message that will be sent to each employee in the body of the email.</p>
             </div>
             
             {% if turnstile_site_key %}
