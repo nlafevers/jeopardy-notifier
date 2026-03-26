@@ -90,38 +90,40 @@
         </div>
         {% endif %}
         
-        <table>
-            <thead>
-                <tr>
-                    <th>Rank</th>
-                    <th>Name</th>
-                    <th>Hours</th>
-                    <th>FTE</th>
-                    <th>Score (Hours/FTE)</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for employee in ranked_employees %}
-                <tr {% if employee.Hours == 0 %}class="zero-hours"{% endif %}>
-                    <td>{{ employee.Rank }}</td>
-                    <td>{{ employee.First }} {{ employee.Last }}</td>
-                    <td>{{ employee.Hours }}</td>
-                    <td>{{ employee.FTE }}</td>
-                    <td>{{ employee.Score|floatformat:2 }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        
-        <div class="buttons">
-            <form method="get" action="{% url 'upload' %}" style="margin: 0;">
-                <button type="submit" class="btn-back">← Back and Edit</button>
-            </form>
-            <form method="post" action="{% url 'send_emails' %}" style="margin: 0;">
-                {% csrf_token %}
-                <button type="submit" class="btn-send">Send Emails →</button>
-            </form>
-        </div>
+        <form method="post" action="{% url 'verification' %}">
+            {% csrf_token %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Include</th>
+                        <th>Rank</th>
+                        <th>Name</th>
+                        <th>Hours</th>
+                        <th>FTE</th>
+                        <th>Score (Hours/FTE)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for employee in ranked_employees %}
+                    <tr {% if employee.Hours == 0 %}class="zero-hours"{% endif %}>
+                        <td>
+                            <input type="checkbox" name="selected" value="{{ employee.Qgenda }}" {% if employee.Qgenda in selected_names %}checked{% endif %}>
+                        </td>
+                        <td>{{ employee.Rank }}</td>
+                        <td>{{ employee.First }} {{ employee.Last }}</td>
+                        <td>{{ employee.Hours }}</td>
+                        <td>{{ employee.FTE }}</td>
+                        <td>{{ employee.Score|floatformat:2 }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <div class="buttons">
+                <button type="submit" name="action" value="update" class="btn-back">Update Selection</button>
+                <button type="submit" name="action" value="send" class="btn-send">Send Emails →</button>
+            </div>
+        </form>
     </div>
 </body>
 </html>

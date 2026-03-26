@@ -18,6 +18,7 @@ def rank_employees(hours_df: pd.DataFrame, roster_df: pd.DataFrame, assignment: 
 
     # Merge with roster_df. We use a right merge to keep all employees from the roster.
     merged_df = pd.merge(assignment_hours, roster_df, left_index=True, right_on='Qgenda Name', how='right')
+    merged_df = merged_df.rename(columns={'Qgenda Name': 'Qgenda'})
     
     # Fill NaN hours with 0 for employees in roster but not in the report
     merged_df['Hours'] = merged_df['Hours'].fillna(0)
