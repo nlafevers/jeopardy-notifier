@@ -131,20 +131,26 @@ Set `REQUIRE_TURNSTILE=false` in `.env.local` to skip bot verification during de
 
 ### Hours Report Format
 
-Create an Excel file named `test_hours.xlsx`:
+Create an Excel file named `test_hours.xlsx` that mimics the app parser structure:
 
-```
-Employee Name | Jeopardy 7a-7a HA | Other Assignment HA
-John Doe      | 40                | 20
-Jane Smith    | 35                | 25
-Bob Johnson   | 45                | 15
-Alice Brown   | 30                | 35
-```
+- Employee names in column A (0 index), starting on row 6 (row 5 in zero-based code).
+- Assignment name labels in row 3 (row 2 in zero-based code).
+- Measure labels in row 5 (row 4 in zero-based code), with `HA` under the hours columns you want to parse.
+- Each assignment typically uses a block like `PA`, `PT`, `CA`, `CT`, `HA`, `HT`; only the `HA` column is used for ranking.
 
-**Column headers:**
-- Row 1: Assignment names
-- Row 2: "HA" (Hours Assigned)
-- Data starts in Row 3
+Example layout (in a simplified 6+ rows form):
+
+Row 1: (unused header row)
+Row 2: (unused)
+Row 3: | "" | "Jeopardy 7a-7a" | "Other Assignment" |
+Row 4: | "" | "[M-Su]" | "[M-Su]" |
+Row 5: | "" | "PA" | "PT" | "CA" | "CT" | "HA" | "HT" |
+Row 6: | "Employee1" | 0 | 0 | 0 | 0 | 0 | 0 |
+
+**Required parser rows/columns:**
+- Row 3 (zero based index 2): assignment names.
+- Row 5 (zero based index 4): measure labels (`HA` marker position determines which column is used for each assignment).
+- Names start row 6/zero-based 5; stop at empty or `Totals`.
 
 ### Employee Roster Format
 
@@ -187,8 +193,13 @@ Alice Brown | Alice      | Brown     | alice@example.com  | 0.75
    - Any with 0 hours should be highlighted
    - You can go back and edit
 
-4. **Test email sending:**
-   - Click "Send Emails"
+4. **Deselect and rerank:**
+   - In verification, uncheck one or more employees via the "Include" checkboxes
+   - Click "Update Selection"
+   - The page should refresh with only selected employees shown and rank values recalculated
+
+5. **Test email sending:**
+   - After selection update, click "Send Emails"
    - In development mode, emails appear in terminal (not actually sent)
    - Session data should be cleared
 
