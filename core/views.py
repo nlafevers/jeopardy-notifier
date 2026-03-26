@@ -43,21 +43,26 @@ def verification_view(request):
 
     if request.method == 'POST':
         selected_names = request.POST.getlist('selected')
+        action = request.POST.get('action')
 
         if selected_names:
             filtered_df = ranked_df[ranked_df['Qgenda'].astype(str).isin(selected_names)].copy()
         else:
             filtered_df = ranked_df.iloc[0:0].copy()
 
-        if not filtered_df.empty:
-            filtered_df = filtered_df.sort_values('Score', ascending=False)
-            filtered_df['Rank'] = filtered_df['Score'].rank(method='dense', ascending=False).astype(int)
+        if action == 'update':
+            if not filtered_df.empty:
+                filtered_df = filtered_df.sort_values('Score', ascending=False)
+                filtered_df['Rank'] = filtered_df['Score'].rank(method='dense', ascending=False).astype(int)
 
-        request.session['ranked_data'] = filtered_df.to_json(orient='split')
-        ranked_df = filtered_df
+            request.session['ranked_data'] = filtered_df.to_json(orient='split')
+            ranked_df = filtered_df
 
-        if request.POST.get('action') == 'send':
+        elif action == 'send':
+            # Apply selected subset exactly as displayed, without recomputing ranking.
+            request.session['ranked_data'] = filtered_df.to_json(orient='split')
             return redirect('send_emails')
+
 
     # Get employees with 0 hours who were not in the original report
     # (this requires more info than is currently passed)
