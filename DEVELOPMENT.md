@@ -191,7 +191,6 @@ Alice Brown | Alice      | Brown     | alice@example.com  | 0.75
 3. **Verify rankings:**
    - Should see employees ranked by hours/FTE
    - Any with 0 hours should be highlighted
-   - You can go back and edit
 
 4. **Deselect and rerank:**
    - In verification, uncheck one or more employees via the "Include" checkboxes
