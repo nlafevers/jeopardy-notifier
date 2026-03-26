@@ -38,19 +38,38 @@ def verification_view(request):
     ranked_data_json = request.session.get('ranked_data')
     if not ranked_data_json:
         return redirect('upload')
-        
+
     ranked_df = pd.read_json(StringIO(ranked_data_json), orient='split')
-    
+
+    if request.method == 'POST':
+        selected_names = request.POST.getlist('selected')
+
+        if selected_names:
+            filtered_df = ranked_df[ranked_df['Qgenda'].astype(str).isin(selected_names)].copy()
+        else:
+            filtered_df = ranked_df.iloc[0:0].copy()
+
+        if not filtered_df.empty:
+            filtered_df = filtered_df.sort_values('Score', ascending=False)
+            filtered_df['Rank'] = filtered_df['Score'].rank(method='dense', ascending=False).astype(int)
+
+        request.session['ranked_data'] = filtered_df.to_json(orient='split')
+        ranked_df = filtered_df
+
+        if request.POST.get('action') == 'send':
+            return redirect('send_emails')
+
     # Get employees with 0 hours who were not in the original report
     # (this requires more info than is currently passed)
     # For now, just flagging those with 0 hours.
     flagged_employees = ranked_df[ranked_df['Hours'] == 0]
-    
+
     context = {
         'ranked_employees': ranked_df.to_dict('records'),
-        'flagged_employees': flagged_employees.to_dict('records')
+        'flagged_employees': flagged_employees.to_dict('records'),
+        'selected_names': ranked_df['Qgenda'].astype(str).tolist()
     }
-    
+
     return render(request, 'core/verification.html', context)
 
 def send_emails_view(request):
@@ -66,7 +85,7 @@ def send_emails_view(request):
     email_template = (
         "Hello {first_name},\n\n"
         "We have some unfilled jeopardy shifts in the next few weeks, please login to Qgenda and consider signing up if you are available. "
-        "Please find below your current ranking:\n\n"
+        "Here is your current ranking:\n\n"
         "<employee ranking>\n"
     )
     
