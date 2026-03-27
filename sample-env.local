@@ -1,3 +1,5 @@
+# Rename this file to .env.local
+
 DEBUG=true
 SECRET_KEY=django-insecure-dev-key-for-testing
 ALLOWED_HOSTS=localhost,127.0.0.1
