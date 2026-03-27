@@ -1,6 +1,14 @@
 import pandas as pd
 from typing import IO
 
+
+EXPECTED_ROSTER_COLUMNS = [
+    'Qgenda Name',
+    'Email Name',
+    'Email Addresses',
+    'FTE',
+]
+
 def parse_hours_report(file: IO) -> pd.DataFrame:
     """
     Parses the hours report Excel file.
@@ -68,9 +76,18 @@ def parse_roster(file: IO) -> pd.DataFrame:
         A pandas DataFrame with employee info (name, email, FTE).
     """
     df = pd.read_excel(file, header=0)
+
+    actual_columns = df.columns.tolist()
+    if actual_columns != EXPECTED_ROSTER_COLUMNS:
+        raise ValueError(
+            'Roster must contain exactly these columns in order: '
+            + ' | '.join(EXPECTED_ROSTER_COLUMNS)
+        )
     
     # Standardize email column name to 'Email' for consistency
     if 'Email Addresses' in df.columns:
         df = df.rename(columns={'Email Addresses': 'Email'})
+
+    df = df.rename(columns={'Email Name': 'EmailName'})
     
     return df

@@ -102,8 +102,8 @@ def verification_view(request):
 
                 ranked_subset = filtered_df.loc[rankable_mask].sort_values('Score', ascending=False)
                 dnr_subset = filtered_df.loc[~rankable_mask].sort_values(
-                    ['Hours', 'Last', 'First'],
-                    ascending=[False, True, True],
+                    ['Hours', 'EmailName'],
+                    ascending=[False, True],
                 )
                 filtered_df = pd.concat([ranked_subset, dnr_subset], ignore_index=True)
 
@@ -169,7 +169,7 @@ def send_emails_view(request):
                 continue
             
             # Format employee name
-            first_name = employee.get('First', employee.get('first_name', 'Employee'))
+            first_name = employee.get('EmailName', employee.get('first_name', 'Employee'))
             rank = employee.get('Rank', 'N/A')
             score_display = 'N/A' if employee.get('DoNotRank') else f"{float(employee.get('Score', 0)):.2f}"
             

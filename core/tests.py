@@ -6,6 +6,7 @@ from django.urls import reverse
 import pandas as pd
 
 from .forms import UploadForm
+from .services.parser import parse_roster
 from .services.ranking import rank_employees
 
 
@@ -131,11 +132,11 @@ class RankingTests(TestCase):
         roster_df = pd.DataFrame(
             {
                 'Qgenda Name': ['Alice Able', 'Bob Baker', 'Cara Clark'],
-                'First Name': ['Alice', 'Bob', 'Cara'],
-                'Last Name': ['Able', 'Baker', 'Clark'],
+                'Email Name': ['Alice', 'Bob', 'Cara'],
                 'FTE': [1.0, 0.0, 0.5],
             }
         )
+        roster_df['Email Addresses'] = ['alice@example.com', 'bob@example.com', 'cara@example.com']
 
         ranked_df = rank_employees(hours_df, roster_df, 'Jeopardy 7a-7a')
 
@@ -150,8 +151,7 @@ class RankingTests(TestCase):
             [
                 {
                     'Qgenda': 'Alice Able',
-                    'First': 'Alice',
-                    'Last': 'Able',
+                    'EmailName': 'Alice',
                     'Hours': 8,
                     'FTE': 1.0,
                     'Score': 8.0,
@@ -160,8 +160,7 @@ class RankingTests(TestCase):
                 },
                 {
                     'Qgenda': 'Bob Baker',
-                    'First': 'Bob',
-                    'Last': 'Baker',
+                    'EmailName': 'Bob',
                     'Hours': 0,
                     'FTE': 0.0,
                     'Score': None,
@@ -181,3 +180,41 @@ class RankingTests(TestCase):
         self.assertContains(response, 'value="Bob Baker"', html=False)
         self.assertNotContains(response, 'value="Bob Baker" checked', html=False)
         self.assertContains(response, 'DNR', html=False)
+
+
+class ParserTests(TestCase):
+    def test_parse_roster_requires_new_four_column_layout(self):
+        roster_df = pd.DataFrame(
+            {
+                'Qgenda Name': ['Alice Able'],
+                'Email Name': ['Alice'],
+                'Email Addresses': ['alice@example.com'],
+                'FTE': [1.0],
+            }
+        )
+
+        roster_path = '/tmp/test-roster.xlsx'
+        roster_df.to_excel(roster_path, index=False)
+
+        with open(roster_path, 'rb') as roster_file:
+            parsed_df = parse_roster(roster_file)
+
+        self.assertEqual(parsed_df.columns.tolist(), ['Qgenda Name', 'EmailName', 'Email', 'FTE'])
+
+    def test_parse_roster_rejects_old_five_column_layout(self):
+        roster_df = pd.DataFrame(
+            {
+                'Qgenda Name': ['Alice Able'],
+                'First Name': ['Alice'],
+                'Last Name': ['Able'],
+                'Email Addresses': ['alice@example.com'],
+                'FTE': [1.0],
+            }
+        )
+
+        roster_path = '/tmp/test-roster-old.xlsx'
+        roster_df.to_excel(roster_path, index=False)
+
+        with open(roster_path, 'rb') as roster_file:
+            with self.assertRaises(ValueError):
+                parse_roster(roster_file)

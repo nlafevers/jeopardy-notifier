@@ -17,7 +17,7 @@ def _finalize_rankings(df: pd.DataFrame) -> pd.DataFrame:
     df.loc[~ranked_mask, 'Rank'] = 'DNR'
 
     ranked_df = df.loc[ranked_mask].sort_values('Score', ascending=False)
-    dnr_df = df.loc[~ranked_mask].sort_values(['Hours', 'Last Name', 'First Name'], ascending=[False, True, True])
+    dnr_df = df.loc[~ranked_mask].sort_values(['Hours', 'EmailName'], ascending=[False, True])
 
     return pd.concat([ranked_df, dnr_df], ignore_index=True)
 
@@ -45,10 +45,4 @@ def rank_employees(hours_df: pd.DataFrame, roster_df: pd.DataFrame, assignment: 
     # Fill NaN hours with 0 for employees in roster but not in the report
     merged_df['Hours'] = merged_df['Hours'].fillna(0)
     
-    # Rename columns to avoid spaces for template compatibility
-    merged_df = merged_df.rename(columns={
-        'First Name': 'First',
-        'Last Name': 'Last'
-    })
-
     return _finalize_rankings(merged_df)

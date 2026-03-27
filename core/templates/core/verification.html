@@ -129,7 +129,7 @@
                             <input type="checkbox" name="selected" value="{{ employee.Qgenda }}" {% if employee.Qgenda in selected_names %}checked{% endif %}>
                         </td>
                         <td>{{ employee.Rank }}</td>
-                        <td>{{ employee.First }} {{ employee.Last }}</td>
+                        <td>{{ employee.Qgenda }}</td>
                         <td>{{ employee.Hours }}</td>
                         <td>{{ employee.FTE }}</td>
                         <td>{% if employee.DoNotRank %}N/A{% else %}{{ employee.Score|floatformat:2 }}{% endif %}</td>
