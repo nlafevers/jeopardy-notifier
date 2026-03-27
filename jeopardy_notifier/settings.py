@@ -173,6 +173,7 @@ TURNSTILE_SITE_KEY = os.getenv('TURNSTILE_SITE_KEY', '')
 TURNSTILE_SECRET_KEY = os.getenv('TURNSTILE_SECRET_KEY', '')
 REQUIRE_TURNSTILE = os.getenv('REQUIRE_TURNSTILE', 'False').lower() == 'true'
 
+# For debugging purposes, print out the loaded environment variables
 print("--- Environment Variables ---")
 for key, value in os.environ.items():
     print(f"{key}={value}")
