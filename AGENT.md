@@ -111,3 +111,6 @@ See `README.md` for detailed step-by-step deployment instructions.
 - Fixed local Turnstile configuration loading so `.env.local` is read before Turnstile settings are evaluated.
 - Fixed the upload page Turnstile widget so successful verification writes the token into the hidden form field expected by Django validation.
 - Added Turnstile form tests covering the required-token and valid-token submission paths.
+- Re-enabled Django CSRF protection and restricted the email-send endpoint to `POST`.
+- Hardened Django production settings for secure cookies, HTTPS redirect, HSTS, and fail-closed secret/host configuration.
+- Added upload validation for spreadsheet type and size, plus session cleanup for abandoned workflows.

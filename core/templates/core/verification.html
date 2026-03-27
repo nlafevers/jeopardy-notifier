@@ -136,7 +136,7 @@
 
             <div class="buttons">
                 <button type="submit" name="action" value="update" class="btn-back">Update Selection</button>
-                <button type="submit" name="action" value="send" class="btn-send">Send Emails →</button>
+                <button type="submit" formaction="{% url 'send_emails' %}" class="btn-send">Send Emails →</button>
             </div>
         </form>
     </div>

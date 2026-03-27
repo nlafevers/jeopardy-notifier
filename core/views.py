@@ -1,5 +1,6 @@
 from django.shortcuts import render, redirect
 from django.conf import settings
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
 from .forms import UploadForm
 from .services.parser import parse_hours_report, parse_roster
 from .services.ranking import rank_employees
@@ -7,32 +8,51 @@ from .services.email import MailgunService
 import pandas as pd
 from io import StringIO
 
+WORKFLOW_SESSION_KEYS = (
+    'ranked_data',
+    'custom_message',
+    'email_count',
+    'human_verified',
+)
+
+
+def clear_workflow_session(request):
+    for key in WORKFLOW_SESSION_KEYS:
+        request.session.pop(key, None)
+
+
+@require_http_methods(['GET', 'POST'])
 def upload_view(request):
-    if request.method == 'POST':
+    if request.method == 'GET':
+        clear_workflow_session(request)
+        form = UploadForm()
+    else:
         form = UploadForm(request.POST, request.FILES)
+    if request.method == 'POST':
         if form.is_valid():
             hours_report_file = form.cleaned_data['hours_report']
             roster_file = form.cleaned_data['roster']
             assignment = form.cleaned_data['assignment']
-            
-            hours_df = parse_hours_report(hours_report_file)
-            roster_df = parse_roster(roster_file)
-            
-            ranked_df = rank_employees(hours_df, roster_df, assignment)
-            
+
+            try:
+                hours_df = parse_hours_report(hours_report_file)
+                roster_df = parse_roster(roster_file)
+                ranked_df = rank_employees(hours_df, roster_df, assignment)
+            except Exception:
+                form.add_error(None, 'We could not read one or both spreadsheets. Please confirm the file format and contents.')
+                context = {
+                    'form': form,
+                    'turnstile_site_key': getattr(settings, 'TURNSTILE_SITE_KEY', '')
+                }
+                return render(request, 'core/upload.html', context, status=400)
+
             # Store ranked data in session
             request.session['ranked_data'] = ranked_df.to_json(orient='split')
             request.session['custom_message'] = form.cleaned_data['custom_message']
-
-            # Mark the request as human-verified (or always true if Turnstile not required)
-            if getattr(settings, 'REQUIRE_TURNSTILE', False):
-                request.session['human_verified'] = True
-            else:
-                request.session['human_verified'] = True
+            request.session['human_verified'] = True
+            request.session.set_expiry(getattr(settings, 'SESSION_COOKIE_AGE', 1800))
 
             return redirect('verification')
-    else:
-        form = UploadForm()
     
     context = {
         'form': form,
@@ -40,6 +60,7 @@ def upload_view(request):
     }
     return render(request, 'core/upload.html', context)
 
+@require_http_methods(['GET', 'POST'])
 def verification_view(request):
     if getattr(settings, 'REQUIRE_TURNSTILE', False) and not request.session.get('human_verified'):
         return redirect('upload')
@@ -86,6 +107,7 @@ def verification_view(request):
 
     return render(request, 'core/verification.html', context)
 
+@require_POST
 def send_emails_view(request):
     """Send notification emails to all ranked employees."""
     if getattr(settings, 'REQUIRE_TURNSTILE', False) and not request.session.get('human_verified'):
@@ -156,11 +178,12 @@ def send_emails_view(request):
     request.session['email_count'] = email_count
     
     # Clear sensitive data from session
-    del request.session['ranked_data']
-    del request.session['custom_message']
+    request.session.pop('ranked_data', None)
+    request.session.pop('custom_message', None)
     
     return redirect('confirmation')
 
+@require_GET
 def confirmation_view(request):
     """Show confirmation that emails have been sent and data has been cleared."""
     if getattr(settings, 'REQUIRE_TURNSTILE', False) and not request.session.get('human_verified'):

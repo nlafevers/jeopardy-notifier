@@ -1,6 +1,11 @@
 from django import forms
 from django.conf import settings
 
+
+MAX_UPLOAD_SIZE = 5 * 1024 * 1024
+ALLOWED_SPREADSHEET_EXTENSIONS = {'.xlsx', '.xls', '.xlsm'}
+
+
 class TurnstileWidget(forms.Widget):
     """Widget for Cloudflare Turnstile bot detection."""
     
@@ -27,6 +32,26 @@ class UploadForm(forms.Form):
         required=False,
         label='Verification'
     )
+
+    def _validate_spreadsheet_upload(self, file, field_label: str):
+        if not file:
+            return file
+
+        file_name = getattr(file, 'name', '')
+        lower_name = file_name.lower()
+        if not any(lower_name.endswith(extension) for extension in ALLOWED_SPREADSHEET_EXTENSIONS):
+            raise forms.ValidationError(f'{field_label} must be an Excel spreadsheet (.xlsx, .xls, or .xlsm).')
+
+        if file.size > MAX_UPLOAD_SIZE:
+            raise forms.ValidationError(f'{field_label} must be 5 MB or smaller.')
+
+        return file
+
+    def clean_hours_report(self):
+        return self._validate_spreadsheet_upload(self.cleaned_data.get('hours_report'), 'Hours Report')
+
+    def clean_roster(self):
+        return self._validate_spreadsheet_upload(self.cleaned_data.get('roster'), 'Employee Roster')
     
     def clean(self):
         cleaned_data = super().clean()

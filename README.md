@@ -76,15 +76,14 @@ python3 -m venv .venv
 source .venv/bin/activate
 
 # Install dependencies (using uv)
-uv pip install django pandas openpyxl requests
+uv pip install django pandas openpyxl requests python-dotenv gunicorn
 ```
 
 ### Set Up Django
 
 ```bash
-# Create Django superuser (optional, for admin panel)
+# Run database migrations
 python manage.py migrate
-python manage.py createsuperuser --noinput --username admin --email admin@example.com
 
 # Collect static files
 python manage.py collectstatic --noinput
@@ -128,38 +127,20 @@ REQUIRE_TURNSTILE=true
 DEBUG=false
 SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')
 ALLOWED_HOSTS=your_domain.com,www.your_domain.com,your_vm_ip
+CSRF_TRUSTED_ORIGINS=https://your_domain.com,https://www.your_domain.com
+SECURE_SSL_REDIRECT=true
+SESSION_COOKIE_SECURE=true
+CSRF_COOKIE_SECURE=true
+SECURE_HSTS_SECONDS=31536000
+SECURE_HSTS_INCLUDE_SUBDOMAINS=true
+SECURE_HSTS_PRELOAD=true
 EOF
 
 # Secure the .env file
 chmod 600 /home/$USER/jeopardy-notifier/.env
 ```
 
-### Update Django Settings
-
-Modify `jeopardy_notifier/settings.py` to load environment variables:
-
-```python
-# At the top of settings.py, add:
-import os
-from pathlib import Path
-
-# ... existing code ...
-
-# Load environment variables
-from dotenv import load_dotenv
-load_dotenv()
-
-# Update these settings to use environment variables:
-DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
-SECRET_KEY = os.getenv('SECRET_KEY', 'your-fallback-key')
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
-```
-
-Install python-dotenv:
-```bash
-source .venv/bin/activate
-pip install python-dotenv
-```
+The application already loads `.env` automatically in production and `.env.local` for local overrides, so no manual settings.py edits are needed.
 
 ---
 
@@ -169,7 +150,6 @@ pip install python-dotenv
 
 ```bash
 source ~/.venv/bin/activate
-pip install gunicorn
 
 # Create systemd service for Gunicorn
 sudo tee /etc/systemd/system/jeopardy-notifier.service > /dev/null << EOF
@@ -233,19 +213,27 @@ sudo nginx -t
 sudo systemctl restart nginx
 ```
 
-### Set Up HTTPS (Optional but Recommended)
+### Set Up HTTPS (Required for Production)
 
 ```bash
 sudo apt install -y certbot python3-certbot-nginx
 sudo certbot --nginx -d your_domain.com -d www.your_domain.com
 ```
 
+After HTTPS is enabled, confirm your Nginx config continues to send:
+
+```nginx
+proxy_set_header X-Forwarded-Proto $scheme;
+```
+
+That header is required so Django can correctly recognize secure requests behind Nginx.
+
 ---
 
 ## Step 5: Deploy
 
-Your application is now live! Access it at:
-- `http://your_domain.com` or `http://your_vm_ip`
+Your application is now live. Access it at:
+- `https://your_domain.com`
 
 ---
 
@@ -275,7 +263,7 @@ Your application is now live! Access it at:
 7. **Review Rankings:**
    - Verify the rankings are correct
    - Employees with 0 hours are flagged
-   - Choose "Send Emails" to proceed or "Back and Edit" to make changes
+   - Choose "Send Emails" to proceed or update the selection before sending
 
 8. **Confirmation:**
    - See confirmation that emails have been sent
@@ -290,9 +278,14 @@ Your application is now live! Access it at:
 - Should include an "HA" (Hours Assigned) or similar suffix per assignment column
 
 #### Employee Info
-- Column headers: `Qgenda Name`, `First Name`, `Last Name`, `Email`, `FTE`
+- Column headers: `Qgenda Name`, `First Name`, `Last Name`, `Email Addresses`, `FTE`
 - One employee per row
 - FTE values (e.g., 1.0 for full-time, 0.5 for part-time)
+
+### Upload Limits
+
+- Each uploaded spreadsheet must be an Excel file: `.xlsx`, `.xls`, or `.xlsm`
+- Each file must be 5 MB or smaller
 
 ---
 
@@ -302,6 +295,7 @@ Your application is now live! Access it at:
 
 - ✅ No user data is stored permanently
 - ✅ All uploaded files and ranking data are deleted immediately after emails are sent
+- ✅ Abandoned workflows are cleared when a new upload session begins, and browser sessions expire automatically
 - ✅ Each employee only receives their own ranking, not others' information
 - ✅ No login or tracking of users
 - ✅ Bot detection to prevent misuse
@@ -320,11 +314,18 @@ Your application is now live! Access it at:
 - Refresh the page
 - Check Turnstile keys are correct in `.env`
 - Ensure `REQUIRE_TURNSTILE=true` in `.env`
+- If deployed behind Nginx or another proxy, make sure HTTPS is working and `CSRF_TRUSTED_ORIGINS` matches your public `https://` URLs
 
 ### "Excel parsing error"
 - Ensure Excel files have correct column names
 - Check for merged cells or unusual formatting
 - Try re-saving files as .xlsx (not .xls)
+- Ensure each uploaded file is 5 MB or smaller
+
+### Application redirects unexpectedly to HTTPS locally
+- Set `DEBUG=true` in `.env.local`
+- Leave `SECURE_SSL_REDIRECT=false` in local development
+- Use `.env` for deployment values and `.env.local` only for local overrides
 
 ### Application won't start
 ```bash
@@ -353,7 +354,7 @@ sudo systemctl restart jeopardy-notifier
 cd /home/$USER/jeopardy-notifier
 git pull origin main
 source .venv/bin/activate
-pip install -r requirements.txt
+uv pip install django pandas openpyxl requests python-dotenv gunicorn
 python manage.py migrate
 sudo systemctl restart jeopardy-notifier
 ```
