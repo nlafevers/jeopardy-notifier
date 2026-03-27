@@ -1,0 +1,30 @@
+DEBUG=true
+SECRET_KEY=django-insecure-dev-key-for-testing
+ALLOWED_HOSTS=localhost,127.0.0.1
+MAILGUN_API_KEY=
+MAILGUN_DOMAIN=
+MAILGUN_FROM_EMAIL=no-reply@example.com
+TURNSTILE_SITE_KEY=1x00000000000000000000AA
+TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA
+REQUIRE_TURNSTILE=true
+SECURE_SSL_REDIRECT=false
+SESSION_COOKIE_SECURE=false
+CSRF_COOKIE_SECURE=false
+SECURE_HSTS_SECONDS=0
+SECURE_HSTS_INCLUDE_SUBDOMAINS=false
+SECURE_HSTS_PRELOAD=false
+CSRF_TRUSTED_ORIGINS=
+
+# Turnstile test sitekeys
+# Sitekey                   Behavior                      Widget Type  Use case
+# 1x00000000000000000000AA  Always passes                 Visible      Test successful form submissions
+# 2x00000000000000000000AB  Always fails                  Visible      Test error handling and retry logic
+# 1x00000000000000000000BB  Always passes                 Invisible    Test invisible widget success flows
+# 2x00000000000000000000BB  Always fails                  Invisible    Test invisible widget error handling
+# 3x00000000000000000000FF  Forces interactive challenge  Visible      Test user interaction scenarios
+
+# Turnstile test secret keys
+# Secret key                           Behavior                             Use case
+# 1x0000000000000000000000000000000AA  Always passes validation             Test successful token validation
+# 2x0000000000000000000000000000000AA  Always fails validation              Test validation error handling
+# 3x0000000000000000000000000000000AA  Returns "token already spent" error  Test duplicate token handling
