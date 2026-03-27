@@ -1,363 +1,278 @@
 # Local Development Setup
 
-This guide walks you through setting up the Jeopardy Notifier application for local development and testing.
+This guide explains how to run and test Jeopardy Notifier locally after the recent security hardening changes.
+
+Yes, you can still test the app locally. The important difference is that Django now reads:
+
+- `.env` for shared or deployment-style settings
+- `.env.local` for local overrides
+
+When both files exist, `.env.local` is loaded after `.env`, so local settings win.
 
 ## Prerequisites
 
 - Python 3.11 or higher
 - Git
-- A code editor (VS Code, PyCharm, etc.)
-- Excel or a spreadsheet application (to create test files)
+- A spreadsheet app for creating test Excel files
 
-## Step 1: Clone & Set Up
+## Step 1: Clone and Install
 
 ```bash
-# Clone the repository
 git clone https://github.com/YOUR_REPO/jeopardy-notifier.git
 cd jeopardy-notifier
 
-# Create virtual environment
 python3 -m venv .venv
-
-# Activate virtual environment
-# On macOS/Linux:
 source .venv/bin/activate
 
-# On Windows:
-# .venv\Scripts\activate
-
-# Install dependencies
-pip install django pandas openpyxl requests python-dotenv
+pip install django pandas openpyxl requests python-dotenv gunicorn
 ```
 
-## Step 2: Set Up Environment Variables
+## Step 2: Create Local Settings
 
-Create a `.env.local` file in the project root (this is local-only, don't commit):
+Create `.env.local` in the project root:
 
 ```bash
 cat > .env.local << EOF
-# Django settings
+# Django
 DEBUG=true
-SECRET_KEY=dev-secret-key-not-for-production
+SECRET_KEY=local-development-secret-key-only
 ALLOWED_HOSTS=localhost,127.0.0.1
 
-# Mailgun (optional for development - can test without)
+# Keep HTTPS-only settings off locally unless you are explicitly testing them
+SECURE_SSL_REDIRECT=false
+SESSION_COOKIE_SECURE=false
+CSRF_COOKIE_SECURE=false
+SECURE_HSTS_SECONDS=0
+SECURE_HSTS_INCLUDE_SUBDOMAINS=false
+SECURE_HSTS_PRELOAD=false
+CSRF_TRUSTED_ORIGINS=
+
+# Short-lived workflow/session data
+SESSION_COOKIE_AGE=1800
+
+# Mailgun (optional for local testing)
 MAILGUN_API_KEY=
 MAILGUN_DOMAIN=
 MAILGUN_FROM_EMAIL=noreply@example.com
 
-# Cloudflare Turnstile (optional for development)
+# Turnstile
+# Option 1: disable locally
+REQUIRE_TURNSTILE=false
 TURNSTILE_SITE_KEY=
 TURNSTILE_SECRET_KEY=
-REQUIRE_TURNSTILE=false
 EOF
 ```
 
-## Step 3: Configure Django Settings for Development
+Notes:
 
-Update `jeopardy_notifier/settings.py` to load `.env.local` for development:
+- If you already have a production-style `.env`, you do not need to remove it. `.env.local` will override it locally.
+- If you want to test Turnstile locally, set `REQUIRE_TURNSTILE=true` and use Cloudflare’s testing keys in `.env.local`.
 
-```python
-# At the very top of settings.py, add:
-import os
-from pathlib import Path
-
-# Load environment variables
-try:
-    from dotenv import load_dotenv
-    load_dotenv('.env.local')  # Load local dev settings
-except ImportError:
-    pass
-
-# Then update these settings:
-DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
-SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-dev-key')
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
-```
-
-## Step 4: Initialize Database
+Example Turnstile local-testing section:
 
 ```bash
-# Create migrations (if not already done)
-python manage.py makemigrations
-
-# Apply migrations
-python manage.py migrate
-
-# (Optional) Create a superuser for admin panel
-python manage.py createsuperuser
+REQUIRE_TURNSTILE=true
+TURNSTILE_SITE_KEY=your_turnstile_test_site_key
+TURNSTILE_SECRET_KEY=your_turnstile_test_secret_key
 ```
 
-## Step 5: Run Development Server
+## Step 3: Initialize the Database
+
+```bash
+python manage.py migrate
+```
+
+## Step 4: Run the App Locally
 
 ```bash
 python manage.py runserver
 ```
 
-You should see:
-```
-Starting development server at http://127.0.0.1:8000/
-```
+Open:
 
-Open your browser to: **http://localhost:8000**
+- `http://127.0.0.1:8000/`
+- or `http://localhost:8000/`
 
----
+With `DEBUG=true`, local testing should work normally without HTTPS redirects.
 
-## Testing Without Real API Keys
+## Step 5: Run Automated Tests
 
-### Test Email Sending (Without Mailgun)
-
-For development/testing, you can log emails to the console instead of actually sending them:
-
-```python
-# In settings.py, add:
-if DEBUG:
-    # Log emails to console in development
-    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-else:
-    # Use Mailgun in production
-    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+```bash
+python manage.py test core.tests
 ```
 
-When emails would be sent, they'll appear in your terminal instead.
+This currently covers:
 
-### Test Bot Detection (Without Turnstile)
+- Turnstile-required form validation
+- valid Turnstile submission handling
+- spreadsheet type validation
+- spreadsheet size validation
+- workflow session cleanup
+- `POST`-only protection on the email-send endpoint
 
-Set `REQUIRE_TURNSTILE=false` in `.env.local` to skip bot verification during development. The form will submit without Turnstile validation.
+## Local Testing Modes
 
----
+### Fastest Local Testing
+
+Use:
+
+- `DEBUG=true`
+- `REQUIRE_TURNSTILE=false`
+- blank Mailgun credentials
+
+This lets you test the upload, verification, and confirmation flow without external services.
+
+### Local Turnstile Testing
+
+Use:
+
+- `DEBUG=true`
+- `REQUIRE_TURNSTILE=true`
+- Turnstile testing keys in `.env.local`
+
+This lets you verify the human-check flow locally.
+
+### Local Mailgun Testing
+
+If you want to exercise the real email path locally, add valid Mailgun credentials to `.env.local`.
+
+If you do not want real emails sent, leave Mailgun credentials blank and avoid the final send step.
 
 ## Creating Test Excel Files
 
-### Hours Report Format
+### Hours Report
 
-Create an Excel file named `test_hours.xlsx` that mimics the app parser structure:
+The parser expects:
 
-- Employee names in column A (0 index), starting on row 6 (row 5 in zero-based code).
-- Assignment name labels in row 3 (row 2 in zero-based code).
-- Measure labels in row 5 (row 4 in zero-based code), with `HA` under the hours columns you want to parse.
-- Each assignment typically uses a block like `PA`, `PT`, `CA`, `CT`, `HA`, `HT`; only the `HA` column is used for ranking.
+- employee names in column A, starting on row 6
+- assignment names on row 3
+- `HA` markers on row 5 for the assignment-hour columns
+- employee rows ending at the first blank name or `Totals`
 
-Example layout (in a simplified 6+ rows form):
+Minimal structure:
 
-Row 1: (unused header row)
-Row 2: (unused)
-Row 3: | "" | "Jeopardy 7a-7a" | "Other Assignment" |
-Row 4: | "" | "[M-Su]" | "[M-Su]" |
-Row 5: | "" | "PA" | "PT" | "CA" | "CT" | "HA" | "HT" |
-Row 6: | "Employee1" | 0 | 0 | 0 | 0 | 0 | 0 |
+- Row 3: assignment names
+- Row 5: measure labels including `HA`
+- Row 6+: employee rows
 
-**Required parser rows/columns:**
-- Row 3 (zero based index 2): assignment names.
-- Row 5 (zero based index 4): measure labels (`HA` marker position determines which column is used for each assignment).
-- Names start row 6/zero-based 5; stop at empty or `Totals`.
+### Employee Roster
 
-### Employee Roster Format
+Use columns:
 
-Create an Excel file named `test_roster.xlsx`:
-
-```
-Qgenda Name | First Name | Last Name | Email              | FTE
-John Doe    | John       | Doe       | john@example.com   | 1.0
-Jane Smith  | Jane       | Smith     | jane@example.com   | 1.0
-Bob Johnson | Bob        | Johnson   | bob@example.com    | 0.5
-Alice Brown | Alice      | Brown     | alice@example.com  | 0.75
+```text
+Qgenda Name | First Name | Last Name | Email Addresses | FTE
 ```
 
-**Required columns:**
-- `Qgenda Name` - Must match names in hours report
-- `First Name` - Employee's first name
-- `Last Name` - Employee's last name
-- `Email` - Where notifications would be sent
-- `FTE` - Full-time equivalent (1.0 = full-time, 0.5 = part-time, etc.)
+Notes:
 
----
+- `Qgenda Name` must match the names used in the hours report
+- `Email Addresses` is the expected roster column heading
+- each uploaded spreadsheet must be `.xlsx`, `.xls`, or `.xlsm`
+- each file must be 5 MB or smaller
 
-## Testing the Full Workflow
+## Manual Local Test Checklist
 
-### Manual Testing Steps
+1. Start the server with `python manage.py runserver`.
+2. Open `http://localhost:8000/`.
+3. Upload a valid hours spreadsheet and roster spreadsheet.
+4. Confirm the ranking page appears and scores are correct.
+5. Uncheck one or more employees and click `Update Selection`.
+6. Confirm the ranking table refreshes with only the selected employees.
+7. Click `Send Emails` only if you have intentionally configured Mailgun for local testing.
+8. Confirm the confirmation page appears and the workflow session is cleared.
 
-1. **Access upload form:**
-   - Go to http://localhost:8000/
-   - You should see the upload form
+Useful scenarios to try:
 
-2. **Upload test files:**
-   - Select `test_hours.xlsx` as the Hours Report
-   - Select `test_roster.xlsx` as the Employee Roster
-   - Enter assignment: `Jeopardy 7a-7a`
-   - Add optional custom message
-   - Click "Upload and Rank"
+- employee with 0 hours
+- different FTE values affecting rank
+- custom message included
+- invalid file type such as `.txt`
+- spreadsheet larger than 5 MB
+- Turnstile enabled with local testing keys
 
-3. **Verify rankings:**
-   - Should see employees ranked by hours/FTE
-   - Any with 0 hours should be highlighted
+## Session and Privacy Behavior in Local Testing
 
-4. **Deselect and rerank:**
-   - In verification, uncheck one or more employees via the "Include" checkboxes
-   - Click "Update Selection"
-   - The page should refresh with only selected employees shown and rank values recalculated
+The app now clears workflow session data when a new upload session starts, and browser sessions expire automatically.
 
-5. **Test email sending:**
-   - After selection update, click "Send Emails"
-   - In development mode, emails appear in terminal (not actually sent)
-   - Session data should be cleared
+That means:
 
-5. **Confirm:**
-   - Should see confirmation page
-   - Session should be cleared (session data gone)
-
-### Test Cases to Try
-
-**Test 1: Basic Ranking**
-- All employees have hours
-- Ranking calculated correctly (hours ÷ FTE)
-
-**Test 2: Zero Hours**
-- Add an employee with 0 hours in test data
-- Verify they're flagged on verification page
-
-**Test 3: Different FTE Values**
-- Employee A: 40 hours, FTE 1.0 = Score 40
-- Employee B: 40 hours, FTE 0.5 = Score 80 (ranked first!)
-- Verify ranking is correct
-
-**Test 4: Custom Message**
-- Add custom message in upload form
-- Verify it appears in email output
-
-**Test 5: Back/Edit Workflow**
-- Upload files, go through verification
-- Click "Back and Edit"
-- Should return to upload form with cleared data
-
----
-
-## Debugging Tips
-
-### View Console Output
-
-The development server terminal shows:
-- Django logs
-- Email output (in console email backend)
-- PHP/SQL queries (if DEBUG=true)
-- Error tracebacks
-
-### Access Admin Panel (Optional)
-
-If you created a superuser, access admin at:
-```
-http://localhost:8000/admin/
-```
-
-Username and password: whatever you set up
-
-### Check Session Data
-
-Add debug logging in views.py to see what's stored in sessions:
-
-```python
-print(f"Session data: {request.session}")
-```
-
-### Database Inspection
-
-View database records:
-
-```bash
-# Open Django shell
-python manage.py shell
-
-# Query examples:
-from core.models import *
-
-# View all records (if models are used)
-# Model.objects.all()
-
-exit()
-```
-
----
+- returning to the upload page starts a fresh workflow
+- abandoned uploads should not linger indefinitely in the active browser session
+- the confirmation page flushes the session after completion
 
 ## Troubleshooting
 
-### "No module named 'openpyxl'"
+### App redirects to HTTPS locally
+
+Make sure `.env.local` contains:
 
 ```bash
-pip install openpyxl
+DEBUG=true
+SECURE_SSL_REDIRECT=false
+SESSION_COOKIE_SECURE=false
+CSRF_COOKIE_SECURE=false
+SECURE_HSTS_SECONDS=0
 ```
 
-### "No module named 'django'"
+### CSRF errors locally
 
-Make sure virtual environment is activated:
+This usually means your local settings are still inheriting production-style values from `.env`.
+
+Confirm `.env.local` overrides:
 
 ```bash
-# macOS/Linux:
+DEBUG=true
+CSRF_TRUSTED_ORIGINS=
+SECURE_SSL_REDIRECT=false
+```
+
+Then restart `runserver`.
+
+### Turnstile succeeds visually but form still fails
+
+Check:
+
+- `REQUIRE_TURNSTILE=true` is set in `.env.local`
+- the testing site key and secret key match
+- the page is loading the current local code
+- your browser devtools show a non-empty `turnstile_response` field at submit time
+
+### Spreadsheet parsing error
+
+Check:
+
+- row layout matches the expected parser format
+- roster column names are correct
+- file extension is `.xlsx`, `.xls`, or `.xlsm`
+- file size is 5 MB or smaller
+
+### `SECRET_KEY must be set when DEBUG is false`
+
+Your local environment is behaving like production. Set:
+
+```bash
+DEBUG=true
+```
+
+in `.env.local`, then restart the server.
+
+### `No module named ...`
+
+Activate the virtual environment first:
+
+```bash
 source .venv/bin/activate
-
-# Windows:
-.venv\Scripts\activate
 ```
 
-### "Address already in use"
+Then install dependencies again if needed.
 
-Port 8000 is already in use. Use a different port:
+## After Local Testing
 
-```bash
-python manage.py runserver 8001
-```
+When you are ready to deploy:
 
-Then visit: http://localhost:8001
-
-### Excel file not parsing correctly
-
-- Ensure columns match expected names exactly
-- Check for merged cells or extra formatting
-- Try saving as `.xlsx` (not `.xls`)
-- Verify headers are in correct rows
-
-### Emails not showing in console
-
-Make sure `DEBUG=true` in `.env.local` and `REQUIRE_TURNSTILE=false`
-
----
-
-## Tips for Development
-
-### Use Hot Reload
-
-The development server automatically reloads when you change Python files. Just save and refresh your browser.
-
-### Disable CSRF for Testing (Development Only)
-
-You can temporarily disable CSRF protection while testing:
-
-```python
-# In settings.py (DEVELOPMENT ONLY!):
-if DEBUG:
-    MIDDLEWARE = [m for m in MIDDLEWARE if m != 'django.middleware.csrf.CsrfViewMiddleware']
-```
-
-### Use Django Shell for Testing
-
-```bash
-python manage.py shell
-
-# Test URL routing:
-from django.urls import reverse
-print(reverse('upload'))  # /
-print(reverse('verification'))  # /verification/
-print(reverse('send_emails'))  # /send/
-print(reverse('confirmation'))  # /confirmation/
-```
-
----
-
-## Next Steps
-
-Once testing is complete:
-
-1. **Fix any bugs** found during testing
-2. **Optimize performance** if needed
-3. **Follow README.md** for production deployment
-4. **Set real API keys** in production `.env` file
-5. **Enable Turnstile** by setting `REQUIRE_TURNSTILE=true`
+1. keep production values in `.env`
+2. keep local-only overrides in `.env.local`
+3. set a strong random production `SECRET_KEY`
+4. set real `ALLOWED_HOSTS`
+5. set real `CSRF_TRUSTED_ORIGINS` with your public `https://` URLs
+6. enable Turnstile in production with `REQUIRE_TURNSTILE=true`
