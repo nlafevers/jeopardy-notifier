@@ -1,5 +1,27 @@
 import pandas as pd
 
+
+def _finalize_rankings(df: pd.DataFrame) -> pd.DataFrame:
+    """Apply rank labels and sort order, excluding FTE 0 employees from ranking."""
+    ranked_mask = df['FTE'] > 0
+
+    df = df.copy()
+    df['DoNotRank'] = ~ranked_mask
+    df['Score'] = df['Hours'] / df['FTE'].where(ranked_mask)
+    df['Rank'] = ''
+
+    if ranked_mask.any():
+        ranked_scores = df.loc[ranked_mask, 'Score']
+        df.loc[ranked_mask, 'Rank'] = ranked_scores.rank(method='dense', ascending=False).astype(int).astype(str)
+
+    df.loc[~ranked_mask, 'Rank'] = 'DNR'
+
+    ranked_df = df.loc[ranked_mask].sort_values('Score', ascending=False)
+    dnr_df = df.loc[~ranked_mask].sort_values(['Hours', 'Last Name', 'First Name'], ascending=[False, True, True])
+
+    return pd.concat([ranked_df, dnr_df], ignore_index=True)
+
+
 def rank_employees(hours_df: pd.DataFrame, roster_df: pd.DataFrame, assignment: str) -> pd.DataFrame:
     """
     Ranks employees based on hours worked in a specific assignment, adjusted for FTE.
@@ -23,21 +45,10 @@ def rank_employees(hours_df: pd.DataFrame, roster_df: pd.DataFrame, assignment: 
     # Fill NaN hours with 0 for employees in roster but not in the report
     merged_df['Hours'] = merged_df['Hours'].fillna(0)
     
-    # TODO: Clarify how to handle FTE == 0. For now, we replace 0 with a small number to avoid division by zero.
-    # Calculate the score
-    merged_df['FTE'] = merged_df['FTE'].replace(0, 1e-9)
-    merged_df['Score'] = merged_df['Hours'] / merged_df['FTE']
-    
-    # Rank the employees
-    merged_df['Rank'] = merged_df['Score'].rank(method='dense', ascending=False).astype(int)
-    
-    # Sort by rank
-    ranked_df = merged_df.sort_values('Rank')
-    
     # Rename columns to avoid spaces for template compatibility
-    ranked_df = ranked_df.rename(columns={
+    merged_df = merged_df.rename(columns={
         'First Name': 'First',
         'Last Name': 'Last'
     })
-    
-    return ranked_df
+
+    return _finalize_rankings(merged_df)

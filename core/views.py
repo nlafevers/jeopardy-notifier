@@ -21,6 +21,10 @@ def clear_workflow_session(request):
         request.session.pop(key, None)
 
 
+def default_selected_names(ranked_df: pd.DataFrame) -> list[str]:
+    return ranked_df.loc[~ranked_df['DoNotRank'], 'Qgenda'].astype(str).tolist()
+
+
 @require_http_methods(['GET', 'POST'])
 def upload_view(request):
     if request.method == 'GET':
@@ -82,8 +86,26 @@ def verification_view(request):
 
         if action == 'update':
             if not filtered_df.empty:
-                filtered_df = filtered_df.sort_values('Score', ascending=False)
-                filtered_df['Rank'] = filtered_df['Score'].rank(method='dense', ascending=False).astype(int)
+                rankable_mask = ~filtered_df['DoNotRank']
+                filtered_df = filtered_df.copy()
+                filtered_df['Rank'] = filtered_df['Rank'].astype(str)
+
+                if rankable_mask.any():
+                    filtered_df.loc[rankable_mask, 'Rank'] = (
+                        filtered_df.loc[rankable_mask, 'Score']
+                        .rank(method='dense', ascending=False)
+                        .astype(int)
+                        .astype(str)
+                    )
+
+                filtered_df.loc[~rankable_mask, 'Rank'] = 'DNR'
+
+                ranked_subset = filtered_df.loc[rankable_mask].sort_values('Score', ascending=False)
+                dnr_subset = filtered_df.loc[~rankable_mask].sort_values(
+                    ['Hours', 'Last', 'First'],
+                    ascending=[False, True, True],
+                )
+                filtered_df = pd.concat([ranked_subset, dnr_subset], ignore_index=True)
 
             request.session['ranked_data'] = filtered_df.to_json(orient='split')
             ranked_df = filtered_df
@@ -97,12 +119,12 @@ def verification_view(request):
     # Get employees with 0 hours who were not in the original report
     # (this requires more info than is currently passed)
     # For now, just flagging those with 0 hours.
-    flagged_employees = ranked_df[ranked_df['Hours'] == 0]
+    flagged_employees = ranked_df[(ranked_df['Hours'] == 0) | (ranked_df['DoNotRank'])]
 
     context = {
         'ranked_employees': ranked_df.to_dict('records'),
         'flagged_employees': flagged_employees.to_dict('records'),
-        'selected_names': ranked_df['Qgenda'].astype(str).tolist()
+        'selected_names': default_selected_names(ranked_df)
     }
 
     return render(request, 'core/verification.html', context)
@@ -148,13 +170,15 @@ def send_emails_view(request):
             
             # Format employee name
             first_name = employee.get('First', employee.get('first_name', 'Employee'))
+            rank = employee.get('Rank', 'N/A')
+            score_display = 'N/A' if employee.get('DoNotRank') else f"{float(employee.get('Score', 0)):.2f}"
             
             # Format ranking info
             ranking_info = (
-                f"Your Ranking: {int(employee.get('Rank', 0))}\n"
+                f"Your Ranking: {rank}\n"
                 f"Hours Worked: {float(employee.get('Hours', 0)):.2f}\n"
                 f"FTE: {float(employee.get('FTE', 1))}\n"
-                f"Score (Hours/FTE): {float(employee.get('Score', 0)):.2f}"
+                f"Score (Hours/FTE): {score_display}"
             )
             
             # Create personalized email body

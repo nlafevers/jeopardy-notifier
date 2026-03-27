@@ -3,8 +3,10 @@ from unittest.mock import patch
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
+import pandas as pd
 
 from .forms import UploadForm
+from .services.ranking import rank_employees
 
 
 def make_excel_upload(name: str) -> SimpleUploadedFile:
@@ -118,3 +120,64 @@ class WorkflowSecurityTests(TestCase):
         response = client.get(reverse('send_emails'))
 
         self.assertEqual(response.status_code, 405)
+
+
+class RankingTests(TestCase):
+    def test_fte_zero_employees_are_marked_do_not_rank_and_sorted_last(self):
+        hours_df = pd.DataFrame(
+            {'Jeopardy 7a-7a': [8, 0, 12]},
+            index=['Alice Able', 'Bob Baker', 'Cara Clark'],
+        )
+        roster_df = pd.DataFrame(
+            {
+                'Qgenda Name': ['Alice Able', 'Bob Baker', 'Cara Clark'],
+                'First Name': ['Alice', 'Bob', 'Cara'],
+                'Last Name': ['Able', 'Baker', 'Clark'],
+                'FTE': [1.0, 0.0, 0.5],
+            }
+        )
+
+        ranked_df = rank_employees(hours_df, roster_df, 'Jeopardy 7a-7a')
+
+        self.assertEqual(ranked_df['Qgenda'].tolist(), ['Cara Clark', 'Alice Able', 'Bob Baker'])
+        self.assertEqual(ranked_df['Rank'].tolist(), ['1', '2', 'DNR'])
+        self.assertEqual(ranked_df['DoNotRank'].tolist(), [False, False, True])
+
+    def test_verification_defaults_do_not_select_dnr_rows(self):
+        client = Client()
+        session = client.session
+        ranked_df = pd.DataFrame(
+            [
+                {
+                    'Qgenda': 'Alice Able',
+                    'First': 'Alice',
+                    'Last': 'Able',
+                    'Hours': 8,
+                    'FTE': 1.0,
+                    'Score': 8.0,
+                    'Rank': '1',
+                    'DoNotRank': False,
+                },
+                {
+                    'Qgenda': 'Bob Baker',
+                    'First': 'Bob',
+                    'Last': 'Baker',
+                    'Hours': 0,
+                    'FTE': 0.0,
+                    'Score': None,
+                    'Rank': 'DNR',
+                    'DoNotRank': True,
+                },
+            ]
+        )
+        session['human_verified'] = True
+        session['ranked_data'] = ranked_df.to_json(orient='split')
+        session.save()
+
+        response = client.get(reverse('verification'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'value="Alice Able" checked', html=False)
+        self.assertContains(response, 'value="Bob Baker"', html=False)
+        self.assertNotContains(response, 'value="Bob Baker" checked', html=False)
+        self.assertContains(response, 'DNR', html=False)

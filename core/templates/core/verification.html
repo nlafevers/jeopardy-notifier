@@ -58,6 +58,10 @@
             background-color: #ffe6e6 !important;
         }
 
+        .do-not-rank {
+            background-color: #fff0b3 !important;
+        }
+
         button {
             padding: 12px 20px;
             background-color: #007bff;
@@ -101,7 +105,7 @@
         
         {% if flagged_employees %}
         <div class="warning">
-            <strong>⚠️ Warning:</strong> {{ flagged_employees|length }} employee(s) have 0 hours in the selected assignment and are flagged below.
+            <strong>⚠️ Warning:</strong> {{ flagged_employees|length }} employee(s) either have 0 hours in the selected assignment or an FTE of 0 and are flagged below.
         </div>
         {% endif %}
         
@@ -120,7 +124,7 @@
                 </thead>
                 <tbody>
                     {% for employee in ranked_employees %}
-                    <tr {% if employee.Hours == 0 %}class="zero-hours"{% endif %}>
+                    <tr class="{% if employee.DoNotRank %}do-not-rank{% elif employee.Hours == 0 %}zero-hours{% endif %}">
                         <td>
                             <input type="checkbox" name="selected" value="{{ employee.Qgenda }}" {% if employee.Qgenda in selected_names %}checked{% endif %}>
                         </td>
@@ -128,7 +132,7 @@
                         <td>{{ employee.First }} {{ employee.Last }}</td>
                         <td>{{ employee.Hours }}</td>
                         <td>{{ employee.FTE }}</td>
-                        <td>{{ employee.Score|floatformat:2 }}</td>
+                        <td>{% if employee.DoNotRank %}N/A{% else %}{{ employee.Score|floatformat:2 }}{% endif %}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
