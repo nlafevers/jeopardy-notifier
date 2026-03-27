@@ -80,9 +80,20 @@ class MailgunService:
     @staticmethod
     def _format_ranking_info(recipient: Dict) -> str:
         """Format employee ranking information for email."""
+        rank = recipient.get('rank', 'N/A')
+        total_ranked = recipient.get('total_ranked')
+        total_ranked_line = (
+            f"Total Ranked Employees: {total_ranked}\n"
+            if total_ranked is not None else
+            ""
+        )
+        score = recipient.get('score')
+        score_display = 'N/A' if score is None else f"{score:.2f}"
+
         return (
-            f"Your Ranking: {recipient.get('rank', 'N/A')}\n"
+            f"Your Ranking: {rank}\n"
+            f"{total_ranked_line}"
             f"Hours Worked: {recipient.get('hours', 0):.2f}\n"
             f"FTE: {recipient.get('fte', 1)}\n"
-            f"Score (Hours/FTE): {recipient.get('score', 0):.2f}"
+            f"Score (Hours/FTE): {score_display}"
         )

@@ -160,6 +160,7 @@ def send_emails_view(request):
     # Send emails via Mailgun
     mailgun = MailgunService()
     email_count = 0
+    total_ranked = int((~ranked_df['DoNotRank']).sum()) if 'DoNotRank' in ranked_df.columns else len(ranked_df)
     
     try:
         for _, employee in ranked_df.iterrows():
@@ -176,6 +177,7 @@ def send_emails_view(request):
             # Format ranking info
             ranking_info = (
                 f"Your Ranking: {rank}\n"
+                f"Total Ranked Employees: {total_ranked}\n"
                 f"Hours Worked: {float(employee.get('Hours', 0)):.2f}\n"
                 f"FTE: {float(employee.get('FTE', 1))}\n"
                 f"Score (Hours/FTE): {score_display}"
