@@ -25,7 +25,7 @@ except ImportError:
 
 if load_dotenv is not None:
     load_dotenv(BASE_DIR / '.env')
-    load_dotenv(BASE_DIR / '.env.local')
+    load_dotenv(BASE_DIR / '.env.local', override=True)
 
 
 # Quick-start development settings - unsuitable for production
@@ -172,3 +172,8 @@ MAILGUN_FROM_EMAIL = os.getenv('MAILGUN_FROM_EMAIL', 'no-reply@jeopardy-notifier
 TURNSTILE_SITE_KEY = os.getenv('TURNSTILE_SITE_KEY', '')
 TURNSTILE_SECRET_KEY = os.getenv('TURNSTILE_SECRET_KEY', '')
 REQUIRE_TURNSTILE = os.getenv('REQUIRE_TURNSTILE', 'False').lower() == 'true'
+
+print("--- Environment Variables ---")
+for key, value in os.environ.items():
+    print(f"{key}={value}")
+print("--------------------------")
