@@ -25,6 +25,13 @@ def default_selected_names(ranked_df: pd.DataFrame) -> list[str]:
     return ranked_df.loc[~ranked_df['DoNotRank'], 'Qgenda'].astype(str).tolist()
 
 
+def filter_selected_employees(ranked_df: pd.DataFrame, selected_names: list[str]) -> pd.DataFrame:
+    if not selected_names:
+        return ranked_df.iloc[0:0].copy()
+
+    return ranked_df[ranked_df['Qgenda'].astype(str).isin(selected_names)].copy()
+
+
 @require_http_methods(['GET', 'POST'])
 def upload_view(request):
     if request.method == 'GET':
@@ -78,11 +85,7 @@ def verification_view(request):
     if request.method == 'POST':
         selected_names = request.POST.getlist('selected')
         action = request.POST.get('action')
-
-        if selected_names:
-            filtered_df = ranked_df[ranked_df['Qgenda'].astype(str).isin(selected_names)].copy()
-        else:
-            filtered_df = ranked_df.iloc[0:0].copy()
+        filtered_df = filter_selected_employees(ranked_df, selected_names)
 
         if action == 'update':
             if not filtered_df.empty:
@@ -140,6 +143,8 @@ def send_emails_view(request):
         return redirect('upload')
     
     ranked_df = pd.read_json(StringIO(ranked_data_json), orient='split')
+    selected_names = request.POST.getlist('selected')
+    recipients_df = filter_selected_employees(ranked_df, selected_names)
     custom_message = request.session.get('custom_message', '')
     
     # Prepare email template body
@@ -163,7 +168,7 @@ def send_emails_view(request):
     total_ranked = int((~ranked_df['DoNotRank']).sum()) if 'DoNotRank' in ranked_df.columns else len(ranked_df)
     
     try:
-        for _, employee in ranked_df.iterrows():
+        for _, employee in recipients_df.iterrows():
             # Get email address - check both 'Email' and 'email' columns
             email = employee.get('Email') or employee.get('email')
             if not email:

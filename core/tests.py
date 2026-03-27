@@ -122,6 +122,56 @@ class WorkflowSecurityTests(TestCase):
 
         self.assertEqual(response.status_code, 405)
 
+    @override_settings(SECURE_SSL_REDIRECT=False)
+    @patch('core.views.MailgunService')
+    def test_send_emails_only_sends_to_selected_employees_without_reranking(self, mock_mailgun_cls):
+        client = Client()
+        session = client.session
+        ranked_df = pd.DataFrame(
+            [
+                {
+                    'Qgenda': 'Alice Able',
+                    'EmailName': 'Alice',
+                    'Email': 'alice@example.com',
+                    'Hours': 8,
+                    'FTE': 1.0,
+                    'Score': 8.0,
+                    'Rank': '2',
+                    'DoNotRank': False,
+                },
+                {
+                    'Qgenda': 'Bob Baker',
+                    'EmailName': 'Bob',
+                    'Email': 'bob@example.com',
+                    'Hours': 12,
+                    'FTE': 1.0,
+                    'Score': 12.0,
+                    'Rank': '1',
+                    'DoNotRank': False,
+                },
+            ]
+        )
+        session['human_verified'] = True
+        session['ranked_data'] = ranked_df.to_json(orient='split')
+        session['custom_message'] = ''
+        session.save()
+
+        mock_mailgun = mock_mailgun_cls.return_value
+        mock_mailgun.send_email.return_value = True
+
+        response = client.post(
+            reverse('send_emails'),
+            {'selected': ['Alice Able']},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse('confirmation'))
+        mock_mailgun.send_email.assert_called_once()
+        args = mock_mailgun.send_email.call_args[0]
+        self.assertEqual(args[0], 'alice@example.com')
+        self.assertIn('Your Ranking: 2', args[2])
+        self.assertIn('Total Ranked Employees: 2', args[2])
+
 
 class RankingTests(TestCase):
     def test_fte_zero_employees_are_marked_do_not_rank_and_sorted_last(self):
