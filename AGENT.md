@@ -105,3 +105,9 @@ Before going live, ensure:
 8. **Test end-to-end** with sample Excel files
 
 See `README.md` for detailed step-by-step deployment instructions.
+
+## Recent Progress
+
+- Fixed local Turnstile configuration loading so `.env.local` is read before Turnstile settings are evaluated.
+- Fixed the upload page Turnstile widget so successful verification writes the token into the hidden form field expected by Django validation.
+- Added Turnstile form tests covering the required-token and valid-token submission paths.

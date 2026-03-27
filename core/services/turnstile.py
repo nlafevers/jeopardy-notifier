@@ -1,5 +1,8 @@
+import logging
+
 import requests
-from typing import Dict
+
+logger = logging.getLogger(__name__)
 
 
 def verify_turnstile_token(token: str, secret_key: str) -> bool:
@@ -27,7 +30,15 @@ def verify_turnstile_token(token: str, secret_key: str) -> bool:
         )
         
         result = response.json()
+        if not result.get('success', False):
+            logger.warning(
+                'Turnstile verification failed',
+                extra={
+                    'turnstile_error_codes': result.get('error-codes', []),
+                    'turnstile_hostname': result.get('hostname'),
+                },
+            )
         return result.get('success', False)
     except Exception as e:
-        print(f"Error verifying Turnstile token: {str(e)}")
+        logger.exception('Error verifying Turnstile token: %s', str(e))
         return False

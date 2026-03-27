@@ -10,10 +10,19 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    load_dotenv = None
+
+if load_dotenv is not None:
+    load_dotenv(BASE_DIR / '.env.local')
 
 
 # Quick-start development settings - unsuitable for production
@@ -119,7 +128,6 @@ STATIC_URL = 'static/'
 
 # Mailgun Configuration
 # Set these via environment variables for security
-import os
 MAILGUN_API_KEY = os.getenv('MAILGUN_API_KEY', '')
 MAILGUN_DOMAIN = os.getenv('MAILGUN_DOMAIN', '')
 MAILGUN_FROM_EMAIL = os.getenv('MAILGUN_FROM_EMAIL', 'no-reply@jeopardy-notifier.example.com')
@@ -130,17 +138,7 @@ TURNSTILE_SITE_KEY = os.getenv('TURNSTILE_SITE_KEY', '')
 TURNSTILE_SECRET_KEY = os.getenv('TURNSTILE_SECRET_KEY', '')
 REQUIRE_TURNSTILE = os.getenv('REQUIRE_TURNSTILE', 'False').lower() == 'true'
 
-# Below are settings for development testing - these should be removed or overridden in production
-if DEBUG:
-    # Load environment variables from .env.local for development
-    try:
-        from dotenv import load_dotenv
-        load_dotenv('.env.local')
-    except ImportError:
-        pass
-
-    # Then update these settings:
-    DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
-    SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-dev-key')
-    ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
-# Remove above test settings when done with development testing and ensure proper environment variables are set in production
+# Development overrides from .env.local
+DEBUG = os.getenv('DEBUG', str(DEBUG)).lower() == 'true'
+SECRET_KEY = os.getenv('SECRET_KEY', SECRET_KEY)
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
