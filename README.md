@@ -213,6 +213,10 @@ sudo nginx -t
 sudo systemctl restart nginx
 ```
 
+### Domain Setup
+
+You can use just an IP address to your VM, but that will give a warning that the site is unsecure since SSL certificates are issued for domains only.  Add the external IP of the VM to the hosted zone A record for any domain and subdomains you want to use.  Then, take the nameservers from the hosted zone and update the nameservers at the domain registry (not the other way around).  
+
 ### Set Up HTTPS (Required for Production)
 
 ```bash
@@ -229,6 +233,10 @@ proxy_set_header X-Forwarded-Proto $scheme;
 That header is required so Django can correctly recognize secure requests behind Nginx.
 
 ---
+
+### Resolve Subdomain Issues
+
+For some reason, although the subdomain was included in the nginx configuration as recommended above, it was necessary to remove the link to the default config in /etc/nginx/sites-enabled for the subdomain to work with https the same as the core domain.
 
 ## Step 5: Deploy
 
