@@ -250,9 +250,9 @@ Your application is now live. Access it at:
 If it is necessary to restart the VM or restart the server on the VM and you get an SSL error from a machine that previously accessed the site, first try forcing a connection to the http version of the site.  Choose the option to proceed anyway.  This will force the machine to renew the SSL session, and might resolve the problem.
 
 Also, if the VM is restarted and doesn't have a static IP, then the new IP will need to be updated in several places:
-A records of DNS provider
-/etc/nginx/sites-available/jeopardy-notifier server_name lines for both the listen 443 ssl server block and the listen 80 server block
-.env file for ALLOWED_HOSTS and CSRF_TRUSTED_ORIGINS
+1. A records of DNS provider
+2. /etc/nginx/sites-available/jeopardy-notifier server_name lines for both the listen 443 ssl server block and the listen 80 server block
+3. .env file for ALLOWED_HOSTS and CSRF_TRUSTED_ORIGINS
 
 ## Usage Instructions
 
