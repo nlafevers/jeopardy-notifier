@@ -12,12 +12,12 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 import os
 from pathlib import Path
-
 from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Load environment variables from .env files if available, with .env.local taking precedence over .env
 try:
     from dotenv import load_dotenv
 except ImportError:
@@ -26,10 +26,6 @@ except ImportError:
 if load_dotenv is not None:
     load_dotenv(BASE_DIR / '.env')
     load_dotenv(BASE_DIR / '.env.local', override=True)
-
-
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
@@ -47,16 +43,8 @@ ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_raw.split(',') if host.s
 if not DEBUG and not ALLOWED_HOSTS:
     raise ImproperlyConfigured('ALLOWED_HOSTS must be set when DEBUG is false.')
 
-
-# Application definition
-
 INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
     'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
     'core',
 ]
 
@@ -65,8 +53,6 @@ MIDDLEWARE = [
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
@@ -134,8 +120,8 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
-
-STATIC_URL = 'static/'
+# STATIC_URL = 'static/'
+# No static files needed for this project, so we can omit STATIC_URL and related settings
 
 # Security settings
 SECURE_SSL_REDIRECT = os.getenv('SECURE_SSL_REDIRECT', 'False' if DEBUG else 'True').lower() == 'true'
