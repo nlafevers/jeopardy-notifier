@@ -14,5 +14,5 @@ RUN uv pip install --system --no-cache -r pyproject.toml
 # Copy all your project files (views, templates, logic) into the container
 COPY . .
 
-# Tell the container to start your app using Gunicorn on the port Cloud Run assigns
-CMD gunicorn --bind :$PORT jeopardy_notifier.wsgi:application
+# Tell the container to run migrations (build the sqlite database) then start your app using Gunicorn on the port Cloud Run assigns
+CMD python manage.py migrate --noinput && gunicorn --bind :$PORT jeopardy_notifier.wsgi:application
