@@ -10,8 +10,11 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import logging
 import os
 from pathlib import Path
+
+import dj_database_url
 from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -27,8 +30,19 @@ if load_dotenv is not None:
     load_dotenv(BASE_DIR / '.env')
     load_dotenv(BASE_DIR / '.env.local', override=True)
 
+
+def env_bool(name: str, default: bool) -> bool:
+    return os.getenv(name, str(default)).lower() == 'true'
+
+
+def env_int(name: str, default: int) -> int:
+    return int(os.getenv(name, str(default)))
+
+
+IS_CLOUD_RUN = bool(os.getenv('K_SERVICE'))
+
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
+DEBUG = env_bool('DEBUG', False)
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv('SECRET_KEY')
@@ -38,7 +52,11 @@ if not SECRET_KEY:
     else:
         raise ImproperlyConfigured('SECRET_KEY must be set when DEBUG is false.')
 
-allowed_hosts_raw = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1' if DEBUG else '')
+default_allowed_hosts = 'localhost,127.0.0.1'
+if IS_CLOUD_RUN:
+    default_allowed_hosts = f'{default_allowed_hosts},.run.app'
+
+allowed_hosts_raw = os.getenv('ALLOWED_HOSTS', default_allowed_hosts if DEBUG or IS_CLOUD_RUN else '')
 ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_raw.split(',') if host.strip()]
 if not DEBUG and not ALLOWED_HOSTS:
     raise ImproperlyConfigured('ALLOWED_HOSTS must be set when DEBUG is false.')
@@ -66,8 +84,6 @@ TEMPLATES = [
         'OPTIONS': {
             'context_processors': [
                 'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
             ],
         },
     },
@@ -79,12 +95,24 @@ WSGI_APPLICATION = 'jeopardy_notifier.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+DATABASE_URL = os.getenv('DATABASE_URL')
+
+if DATABASE_URL:
+    DATABASES = {
+        'default': dj_database_url.parse(
+            DATABASE_URL,
+            conn_max_age=env_int('DB_CONN_MAX_AGE', 600),
+            conn_health_checks=True,
+            ssl_require=not DEBUG,
+        )
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 
 # Password validation
@@ -124,20 +152,17 @@ USE_TZ = True
 # No static files needed for this project, so we can omit STATIC_URL and related settings
 
 # Security settings
-SECURE_SSL_REDIRECT = os.getenv('SECURE_SSL_REDIRECT', 'False' if DEBUG else 'True').lower() == 'true'
+SECURE_SSL_REDIRECT = env_bool('SECURE_SSL_REDIRECT', not DEBUG)
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-SECURE_HSTS_SECONDS = int(os.getenv('SECURE_HSTS_SECONDS', '0' if DEBUG else '31536000'))
-SECURE_HSTS_INCLUDE_SUBDOMAINS = os.getenv(
-    'SECURE_HSTS_INCLUDE_SUBDOMAINS',
-    'False' if DEBUG else 'True',
-).lower() == 'true'
-SECURE_HSTS_PRELOAD = os.getenv('SECURE_HSTS_PRELOAD', 'False' if DEBUG else 'True').lower() == 'true'
-SESSION_COOKIE_SECURE = os.getenv('SESSION_COOKIE_SECURE', 'False' if DEBUG else 'True').lower() == 'true'
+SECURE_HSTS_SECONDS = env_int('SECURE_HSTS_SECONDS', 0 if DEBUG else 31536000)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool('SECURE_HSTS_INCLUDE_SUBDOMAINS', not DEBUG)
+SECURE_HSTS_PRELOAD = env_bool('SECURE_HSTS_PRELOAD', not DEBUG)
+SESSION_COOKIE_SECURE = env_bool('SESSION_COOKIE_SECURE', not DEBUG)
 SESSION_COOKIE_HTTPONLY = True
-SESSION_COOKIE_AGE = int(os.getenv('SESSION_COOKIE_AGE', '1800'))
+SESSION_COOKIE_AGE = env_int('SESSION_COOKIE_AGE', 1800)
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 SESSION_SAVE_EVERY_REQUEST = True
-CSRF_COOKIE_SECURE = os.getenv('CSRF_COOKIE_SECURE', 'False' if DEBUG else 'True').lower() == 'true'
+CSRF_COOKIE_SECURE = env_bool('CSRF_COOKIE_SECURE', not DEBUG)
 CSRF_COOKIE_HTTPONLY = True
 CSRF_TRUSTED_ORIGINS = [
     origin.strip()
@@ -157,10 +182,58 @@ MAILGUN_FROM_EMAIL = os.getenv('MAILGUN_FROM_EMAIL', 'no-reply@jeopardy-notifier
 # Set these via environment variables for security
 TURNSTILE_SITE_KEY = os.getenv('TURNSTILE_SITE_KEY', '')
 TURNSTILE_SECRET_KEY = os.getenv('TURNSTILE_SECRET_KEY', '')
-REQUIRE_TURNSTILE = os.getenv('REQUIRE_TURNSTILE', 'False').lower() == 'true'
+REQUIRE_TURNSTILE = env_bool('REQUIRE_TURNSTILE', False)
 
-# For debugging purposes, print out the loaded environment variables
-print("--- Environment Variables ---")
-for key, value in os.environ.items():
-    print(f"{key}={value}")
-print("--------------------------")
+LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'standard': {
+            'format': '%(asctime)s %(levelname)s %(name)s %(message)s',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'standard',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': LOG_LEVEL,
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': LOG_LEVEL,
+            'propagate': False,
+        },
+        'core': {
+            'handlers': ['console'],
+            'level': LOG_LEVEL,
+            'propagate': False,
+        },
+        'gunicorn.error': {
+            'handlers': ['console'],
+            'level': LOG_LEVEL,
+            'propagate': False,
+        },
+        'gunicorn.access': {
+            'handlers': ['console'],
+            'level': LOG_LEVEL,
+            'propagate': False,
+        },
+    },
+}
+
+logger = logging.getLogger(__name__)
+logger.info(
+    'Django settings loaded',
+    extra={
+        'cloud_run': IS_CLOUD_RUN,
+        'debug': DEBUG,
+        'database_engine': DATABASES['default']['ENGINE'],
+    },
+)

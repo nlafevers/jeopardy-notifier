@@ -108,6 +108,9 @@ See `README.md` for detailed step-by-step deployment instructions.
 
 ## Recent Progress
 
+- Reworked the container startup for Cloud Run so Gunicorn binds to `$PORT`, logs to stdout/stderr, and does not run migrations during web startup.
+- Added Cloud Run-friendly Django configuration for `DATABASE_URL`, centralized logging, and automatic `.run.app` host allowance.
+- Added a `/health/` endpoint and updated deployment documentation away from the VM/Nginx model toward Cloud Run plus a managed database.
 - Fixed local Turnstile configuration loading so `.env.local` is read before Turnstile settings are evaluated.
 - Fixed the upload page Turnstile widget so successful verification writes the token into the hidden form field expected by Django validation.
 - Added Turnstile form tests covering the required-token and valid-token submission paths.

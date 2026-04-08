@@ -1,18 +1,21 @@
-# Start with a modern Python environment
 FROM python:3.13-slim
 
-# Copy the 'uv' tool to manage your specific version of Python and libraries
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-# Set the 'folder' inside the container where the app will live
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    UV_COMPILE_BYTECODE=1 \
+    PORT=8080
+
 WORKDIR /app
 
-# Copy your list of requirements and install them
 COPY pyproject.toml uv.lock ./
-RUN uv pip install --system --no-cache -r pyproject.toml
+RUN uv sync --frozen --no-dev
 
-# Copy all your project files (views, templates, logic) into the container
 COPY . .
 
-# Tell the container to run migrations (build the sqlite database) then start your app using Gunicorn on the port Cloud Run assigns
-CMD python manage.py migrate --noinput && gunicorn --bind :$PORT jeopardy_notifier.wsgi:application
+ENV PATH="/app/.venv/bin:$PATH"
+
+EXPOSE 8080
+
+CMD ["sh", "-c", "if [ -z \"$DATABASE_URL\" ]; then python manage.py migrate --noinput; fi && gunicorn jeopardy_notifier.wsgi:application --bind 0.0.0.0:${PORT:-8080} --workers ${WEB_CONCURRENCY:-1} --threads ${GUNICORN_THREADS:-8} --timeout ${GUNICORN_TIMEOUT:-120} --access-logfile - --error-logfile - --log-level info"]

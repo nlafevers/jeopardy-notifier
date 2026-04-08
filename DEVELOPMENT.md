@@ -82,6 +82,8 @@ TURNSTILE_SECRET_KEY=your_turnstile_test_secret_key
 python manage.py migrate
 ```
 
+If you want local behavior to match Cloud Run more closely, set `DATABASE_URL` to a Postgres instance instead of relying on the default SQLite database.
+
 ## Step 4: Run the App Locally
 
 ```bash
@@ -160,12 +162,13 @@ Minimal structure:
 Use columns:
 
 ```text
-Qgenda Name | First Name | Last Name | Email Addresses | FTE
+Qgenda Name | Email Name | Email Addresses | FTE
 ```
 
 Notes:
 
 - `Qgenda Name` must match the names used in the hours report
+- `Email Name` is the display name used in outbound emails
 - `Email Addresses` is the expected roster column heading
 - each uploaded spreadsheet must be `.xlsx`, `.xls`, or `.xlsm`
 - each file must be 5 MB or smaller

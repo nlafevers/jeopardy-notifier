@@ -3,6 +3,7 @@ import pandas as pd
 
 def _finalize_rankings(df: pd.DataFrame) -> pd.DataFrame:
     """Apply rank labels and sort order, excluding FTE 0 employees from ranking."""
+    display_name_column = 'EmailName' if 'EmailName' in df.columns else 'Email Name'
     ranked_mask = df['FTE'] > 0
 
     df = df.copy()
@@ -17,7 +18,7 @@ def _finalize_rankings(df: pd.DataFrame) -> pd.DataFrame:
     df.loc[~ranked_mask, 'Rank'] = 'DNR'
 
     ranked_df = df.loc[ranked_mask].sort_values('Score', ascending=False)
-    dnr_df = df.loc[~ranked_mask].sort_values(['Hours', 'EmailName'], ascending=[False, True])
+    dnr_df = df.loc[~ranked_mask].sort_values(['Hours', display_name_column], ascending=[False, True])
 
     return pd.concat([ranked_df, dnr_df], ignore_index=True)
 

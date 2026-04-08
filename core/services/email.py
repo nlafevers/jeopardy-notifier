@@ -1,6 +1,9 @@
+import logging
 import requests
 from typing import List, Dict
 from django.conf import settings
+
+logger = logging.getLogger(__name__)
 
 
 class MailgunService:
@@ -39,11 +42,19 @@ class MailgunService:
                     'to': to_email,
                     'subject': subject,
                     'text': text,
-                }
+                },
+                timeout=15,
             )
-            return response.status_code == 200
-        except Exception as e:
-            print(f"Error sending email to {to_email}: {str(e)}")
+            if response.status_code != 200:
+                logger.error(
+                    'Mailgun request failed for recipient %s with status %s',
+                    to_email,
+                    response.status_code,
+                )
+                return False
+            return True
+        except Exception:
+            logger.exception('Error sending email to %s', to_email)
             return False
     
     def send_batch_emails(self, recipients: List[Dict[str, str]], subject: str, 

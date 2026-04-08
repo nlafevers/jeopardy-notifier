@@ -1,404 +1,164 @@
-# Jeopardy Notifier - Deployment & Usage Guide
+# Jeopardy Notifier - Cloud Run Deployment & Usage Guide
 
 ## Overview
 
-**Jeopardy Notifier** is a web application that ranks employees based on hours worked at a specific assignment (adjusted for FTE) and sends personalized email notifications to each employee with their individual ranking.
+**Jeopardy Notifier** is a Django web application that:
 
-The application is designed to:
-- Accept two Excel spreadsheets: one with hours data and one with employee information
-- Automatically rank employees by hours worked divided by their full-time equivalent (FTE) status
-- Send personalized emails with each employee's unique ranking
-- Respect privacy by permanently deleting all user-submitted data after emails are sent
-- Prevent spam with bot detection (Cloudflare Turnstile)
+- accepts two Excel spreadsheets
+- ranks employees by hours worked divided by FTE
+- lets a human verify the ranking before sending
+- sends personalized emails through Mailgun
+- clears workflow data after completion
 
----
+This project now targets **GCP Cloud Run** rather than a long-lived VM.
+
+## Architecture Notes for Cloud Run
+
+Cloud Run changes a few assumptions compared with a VM:
+
+- the container must listen on the provided `PORT`
+- startup should only start the web server, not run migrations
+- logs should go to stdout/stderr so they appear in Cloud Logging
+- local disk is ephemeral and not shared between instances
+- Django session data should live in a shared database if you may scale past one instance
+
+This app stores ranking data in the session between requests. For a free-tier, single-instance deployment, it can still run with the default SQLite database inside the container. If `DATABASE_URL` is omitted, the container now runs Django migrations on startup and uses SQLite automatically.
 
 ## Prerequisites
 
-Before deploying this application, you'll need:
+Before deploying, prepare:
 
-1. **Google Cloud Platform (GCP) Account** - Free tier VM is sufficient
-2. **Mailgun Account** - For sending emails (free tier available)
-3. **Cloudflare Account** - For bot detection with Turnstile (free tier available)
-4. **Python 3.11+** installed on your server
-5. **Git** for cloning the repository
-6. **Domain Name** (optional but recommended for emails)
+1. A GCP project with billing enabled
+2. Cloud Run, Cloud Build, Artifact Registry, and Cloud SQL APIs enabled
+3. A Mailgun account
+4. A Cloudflare Turnstile site
+5. `gcloud` installed locally
 
----
+## Required Environment Variables
 
-## Step 1: Set Up Your Server (GCP)
-
-### Create a VM Instance
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project
-3. Navigate to **Compute Engine > VM Instances**
-4. Click **Create Instance**
-5. Configuration:
-   - **Name:** `jeopardy-notifier` (or your choice)
-   - **Region:** Choose closest to your users
-   - **Machine Type:** `e2-micro` (free tier eligible)
-   - **Boot Disk:** Ubuntu 22.04 LTS, 30GB
-   - **Firewall:** Allow HTTP and HTTPS traffic
-
-6. Click **Create** and wait for the instance to start
-
-### Connect to Your VM
+Set these for production:
 
 ```bash
-# Via Cloud Console, click SSH to open terminal, or use gcloud CLI:
-gcloud compute ssh jeopardy-notifier --zone=YOUR_ZONE
-```
-
----
-
-## Step 2: Clone & Set Up the Application
-
-### Install Dependencies
-
-```bash
-# Update system packages
-sudo apt update && sudo apt upgrade -y
-
-# Install Python and tools
-sudo apt install -y python3-pip python3-venv git
-
-# Install uv for dependency management
-pip3 install uv
-
-# Clone repository
-cd /home/$USER
-git clone https://github.com/YOUR_REPO/jeopardy-notifier.git
-cd jeopardy-notifier
-
-# Create virtual environment
-python3 -m venv .venv
-source .venv/bin/activate
-
-# Install dependencies (using uv)
-uv pip install django pandas openpyxl requests python-dotenv gunicorn
-```
-
-### Set Up Django
-
-```bash
-# Run database migrations
-python manage.py migrate
-
-# Collect static files
-python manage.py collectstatic --noinput
-```
-
----
-
-## Step 3: Configure API Keys
-
-### Get Mailgun API Key
-
-1. Sign up for [Mailgun](https://www.mailgun.com/) (free tier)
-2. Go to **API > Keys** in left sidebar
-3. Copy your **Private API Key**
-4. From **Sending Domain**, copy your domain (e.g., `mg.yourdomain.com`)
-
-### Get Cloudflare Turnstile Keys
-
-1. Sign up for [Cloudflare](https://www.cloudflare.com/) (free tier)
-2. Add your domain to Cloudflare
-3. Go to **Turnstile** under your domain settings
-4. Create a new Turnstile site
-5. Copy **Site Key** and **Secret Key**
-
-### Create Environment Configuration File
-
-```bash
-# Create .env file in project root
-cat > /home/$USER/jeopardy-notifier/.env << EOF
-# Mailgun Configuration
-MAILGUN_API_KEY=your_mailgun_private_api_key_here
-MAILGUN_DOMAIN=mg.yourdomain.com
-MAILGUN_FROM_EMAIL=noreply@yourdomain.com
-
-# Cloudflare Turnstile Configuration
-TURNSTILE_SITE_KEY=your_turnstile_site_key_here
-TURNSTILE_SECRET_KEY=your_turnstile_secret_key_here
-REQUIRE_TURNSTILE=true
-
-# Django Configuration
 DEBUG=false
-SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')
-ALLOWED_HOSTS=your_domain.com,www.your_domain.com,your_vm_ip
-CSRF_TRUSTED_ORIGINS=https://your_domain.com,https://www.your_domain.com
-SECURE_SSL_REDIRECT=true
-SESSION_COOKIE_SECURE=true
-CSRF_COOKIE_SECURE=true
-SECURE_HSTS_SECONDS=31536000
-SECURE_HSTS_INCLUDE_SUBDOMAINS=true
-SECURE_HSTS_PRELOAD=true
-EOF
-
-# Secure the .env file
-chmod 600 /home/$USER/jeopardy-notifier/.env
+SECRET_KEY=replace-me
+ALLOWED_HOSTS=.run.app,your-domain.example
+CSRF_TRUSTED_ORIGINS=https://your-domain.example
+MAILGUN_API_KEY=replace-me
+MAILGUN_DOMAIN=mg.your-domain.example
+MAILGUN_FROM_EMAIL=no-reply@your-domain.example
+TURNSTILE_SITE_KEY=replace-me
+TURNSTILE_SECRET_KEY=replace-me
+REQUIRE_TURNSTILE=true
+LOG_LEVEL=INFO
 ```
 
-The application already loads `.env` automatically in production and `.env.local` for local overrides, so no manual settings.py edits are needed.
+`DATABASE_URL` is optional. If you leave it unset, the app uses SQLite.
 
----
+Use Secret Manager for sensitive values like `SECRET_KEY`, `MAILGUN_API_KEY`, and `TURNSTILE_SECRET_KEY`.
 
-## Step 4: Set Up Web Server (Gunicorn + Nginx)
+## Local Validation
 
-### Install & Configure Gunicorn
+From the repo root:
 
 ```bash
-source ~/.venv/bin/activate
-
-# Create systemd service for Gunicorn
-sudo tee /etc/systemd/system/jeopardy-notifier.service > /dev/null << EOF
-[Unit]
-Description=Jeopardy Notifier Django Application
-After=network.target
-
-[Service]
-Type=notify
-User=$USER
-WorkingDirectory=/home/$USER/jeopardy-notifier
-Environment="PATH=/home/$USER/jeopardy-notifier/.venv/bin"
-ExecStart=/home/$USER/jeopardy-notifier/.venv/bin/gunicorn \
-    --workers 4 \
-    --worker-class sync \
-    --bind 127.0.0.1:8000 \
-    jeopardy_notifier.wsgi:application
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-# Enable and start service
-sudo systemctl daemon-reload
-sudo systemctl enable jeopardy-notifier
-sudo systemctl start jeopardy-notifier
-sudo systemctl status jeopardy-notifier
+uv sync
+uv run python manage.py migrate
+uv run python manage.py runserver
 ```
 
-### Install & Configure Nginx
+Open `http://127.0.0.1:8000/`.
+
+## Deploying to Cloud Run
+
+### 1. Build the image
 
 ```bash
-sudo apt install -y nginx
-
-# Create Nginx configuration
-sudo tee /etc/nginx/sites-available/jeopardy-notifier > /dev/null << 'EOF'
-server {
-    listen 80;
-    server_name your_domain.com www.your_domain.com your_vm_ip;
-
-    client_max_body_size 10M;
-
-    location / {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    location /static/ {
-        alias /home/$USER/jeopardy-notifier/static/;
-        expires 30d;
-    }
-}
-EOF
-
-# Enable the site
-sudo ln -s /etc/nginx/sites-available/jeopardy-notifier /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl restart nginx
+gcloud builds submit --tag northamerica-northeast1-docker.pkg.dev/YOUR_PROJECT/YOUR_REPO/jeopardy-notifier
 ```
 
-### Domain Setup
+### 2. Choose a database mode
 
-You can use just an IP address to your VM, but that will give a warning that the site is unsecure since SSL certificates are issued for domains only.  Add the external IP of the VM to the hosted zone A record for any domain and subdomains you want to use.  Then, take the nameservers from the hosted zone and update the nameservers at the domain registry (not the other way around).  
+For the lowest-cost deployment, do nothing else here and let the app use SQLite.
 
-### Set Up HTTPS (Required for Production)
+If you prefer a persistent shared database, set `DATABASE_URL` and run migrations separately before or alongside deployment:
 
 ```bash
-sudo apt install -y certbot python3-certbot-nginx
-sudo certbot --nginx -d your_domain.com -d www.your_domain.com
+uv run python manage.py migrate
 ```
 
-After HTTPS is enabled, confirm your Nginx config continues to send:
+### 3. Deploy the service
 
-```nginx
-proxy_set_header X-Forwarded-Proto $scheme;
-```
-
-That header is required so Django can correctly recognize secure requests behind Nginx.
-
----
-
-### Resolve Subdomain Issues
-
-For some reason, although the subdomain was included in the nginx configuration as recommended above, it was necessary to remove the link to the default config in /etc/nginx/sites-enabled for the subdomain to work with https the same as the core domain.
-
-## Step 5: Deploy
-
-Your application is now live. Access it at:
-- `https://your_domain.com`
-
----
-
-## Step 6: Re-deployment
-
-If it is necessary to restart the VM or restart the server on the VM and you get an SSL error from a machine that previously accessed the site, first try forcing a connection to the http version of the site.  Choose the option to proceed anyway.  This will force the machine to renew the SSL session, and might resolve the problem.
-
-Also, if the VM is restarted and doesn't have a static IP, then the new IP will need to be updated in several places:
-1. A records of DNS provider
-2. /etc/nginx/sites-available/jeopardy-notifier server_name lines for both the listen 443 ssl server block and the listen 80 server block
-3. .env file for ALLOWED_HOSTS and CSRF_TRUSTED_ORIGINS
-
-## Usage Instructions
-
-### For End Users
-
-1. **Navigate to the application website**
-
-2. **Upload Files:**
-   - **Hours Report:** Excel file from Qgenda with employee hours by assignment
-   - **Employee Info:** Excel file with employee names, emails, and FTE status
-
-3. **Enter Assignment Name:**
-   - The assignment you want to rank employees by (e.g., "Jeopardy 7a-7a")
-   - Default value is provided
-
-4. **Optional: Add Custom Message:**
-   - Add any additional text you want included in the notification emails
-
-5. **Verify You're Human:**
-   - Complete the Cloudflare Turnstile verification
-
-6. **Submit:**
-   - Click "Upload and Rank"
-
-7. **Review Rankings:**
-   - Verify the rankings are correct
-   - Employees with 0 hours are flagged
-   - Choose "Send Emails" to proceed or update the selection before sending
-
-8. **Confirmation:**
-   - See confirmation that emails have been sent
-   - All your data has been permanently deleted
-
-### Excel File Formats
-
-#### Hours Report
-- Employee names in first column
-- Assignments as column headers
-- Hours for each assignment in the data
-- Should include an "HA" (Hours Assigned) or similar suffix per assignment column
-
-#### Employee Info
-- Column headers: `Qgenda Name`, `First Name`, `Last Name`, `Email Addresses`, `FTE`
-- One employee per row
-- FTE values (e.g., 1.0 for full-time, 0.5 for part-time)
-
-### Upload Limits
-
-- Each uploaded spreadsheet must be an Excel file: `.xlsx`, `.xls`, or `.xlsm`
-- Each file must be 5 MB or smaller
-
----
-
-## Privacy & Data Security
-
-**Important:** This application respects user privacy:
-
-- ✅ No user data is stored permanently
-- ✅ All uploaded files and ranking data are deleted immediately after emails are sent
-- ✅ Abandoned workflows are cleared when a new upload session begins, and browser sessions expire automatically
-- ✅ Each employee only receives their own ranking, not others' information
-- ✅ No login or tracking of users
-- ✅ Bot detection to prevent misuse
-
----
-
-## Troubleshooting
-
-### "Emails didn't send"
-1. Check Mailgun API key is correct in `.env`
-2. Verify domain is authorized in Mailgun
-3. Check email addresses in the roster file are valid
-4. Review Mailgun logs for bounce/rejection reasons
-
-### "Verification failed"
-- Refresh the page
-- Check Turnstile keys are correct in `.env`
-- Ensure `REQUIRE_TURNSTILE=true` in `.env`
-- If deployed behind Nginx or another proxy, make sure HTTPS is working and `CSRF_TRUSTED_ORIGINS` matches your public `https://` URLs
-
-### "Excel parsing error"
-- Ensure Excel files have correct column names
-- Check for merged cells or unusual formatting
-- Try re-saving files as .xlsx (not .xls)
-- Ensure each uploaded file is 5 MB or smaller
-
-### Application redirects unexpectedly to HTTPS locally
-- Set `DEBUG=true` in `.env.local`
-- Leave `SECURE_SSL_REDIRECT=false` in local development
-- Use `.env` for deployment values and `.env.local` only for local overrides
-
-### Application won't start
-```bash
-# Check Gunicorn status
-sudo systemctl status jeopardy-notifier
-
-# View logs
-sudo journalctl -u jeopardy-notifier -n 50
-
-# Restart service
-sudo systemctl restart jeopardy-notifier
-```
-
-### Nginx shows 502 Bad Gateway
-- Ensure Gunicorn is running: `sudo systemctl status jeopardy-notifier`
-- Check Nginx configuration: `sudo nginx -t`
-- Restart Nginx: `sudo systemctl restart nginx`
-
----
-
-## Support & Maintenance
-
-### Update the Application
+For your lowest-cost SQLite deployment, use this as the starting point:
 
 ```bash
-cd /home/$USER/jeopardy-notifier
-git pull origin main
-source .venv/bin/activate
-uv pip install django pandas openpyxl requests python-dotenv gunicorn
-python manage.py migrate
-sudo systemctl restart jeopardy-notifier
+gcloud run deploy jeopardy-notifier \
+  --image northamerica-northeast1-docker.pkg.dev/YOUR_PROJECT/YOUR_REPO/jeopardy-notifier \
+  --region northamerica-northeast1 \
+  --allow-unauthenticated \
+  --min-instances 0 \
+  --max-instances 1 \
+  --concurrency 1 \
+  --set-env-vars DEBUG=false,ALLOWED_HOSTS=.run.app,your-domain.example,CSRF_TRUSTED_ORIGINS=https://your-domain.example,MAILGUN_DOMAIN=mg.your-domain.example,MAILGUN_FROM_EMAIL=no-reply@your-domain.example,TURNSTILE_SITE_KEY=replace-me,REQUIRE_TURNSTILE=true,LOG_LEVEL=INFO \
+  --set-secrets SECRET_KEY=django-secret:latest,MAILGUN_API_KEY=mailgun-api-key:latest,TURNSTILE_SECRET_KEY=turnstile-secret:latest
 ```
 
-### Monitor Application Health
+That command intentionally does not set `DATABASE_URL`, so the container will use SQLite and run `migrate` during startup.
+
+The most important SQLite-specific flag here is `--max-instances 1`, which avoids multiple Cloud Run instances each having their own separate local database file.
+
+If you use an external Cloud SQL database, also include:
 
 ```bash
-# Check service status
-sudo systemctl status jeopardy-notifier
-
-# View recent logs
-sudo journalctl -u jeopardy-notifier -n 100 -f
+--add-cloudsql-instances YOUR_PROJECT:northamerica-northeast1:YOUR_INSTANCE
 ```
 
-### Backup Your Configuration
+## Logging and Health Checks
 
-```bash
-# Backup .env file (keep this safe!)
-sudo cp /home/$USER/jeopardy-notifier/.env /home/$USER/.env.backup
-sudo chmod 600 /home/$USER/.env.backup
+- Application and Django logs are written to stdout/stderr for Cloud Logging.
+- Gunicorn access and error logs are enabled in the container command.
+- A basic health endpoint is available at `/health/`.
+
+If a revision fails to become healthy, check:
+
+1. Cloud Run revision logs
+2. Whether `SECRET_KEY` is set
+3. Whether `ALLOWED_HOSTS` and `CSRF_TRUSTED_ORIGINS` include the active hostname
+4. If using `DATABASE_URL`, whether that database is reachable from Cloud Run
+5. If using SQLite, whether startup completed and migrations ran successfully
+
+## Usage
+
+1. Open the app in a browser.
+2. Complete the Turnstile check if enabled.
+3. Upload the hours report and roster spreadsheet.
+4. Review the ranking page.
+5. Update the selected recipients if needed.
+6. Send the emails.
+7. Confirm the completion page appears.
+
+## Spreadsheet Formats
+
+### Hours report
+
+The parser expects:
+
+- employee names in column A starting on row 6
+- assignment names on row 3
+- `HA` markers on row 5 for hour columns
+- rows ending at the first blank name or `Totals`
+
+### Roster
+
+The roster must contain exactly these columns in this order:
+
+```text
+Qgenda Name | Email Name | Email Addresses | FTE
 ```
 
----
+## Operational Recommendations
 
-## Contact & Support
-
-For issues or questions, contact your IT administrator or Django developer.
-
-**Application Version:** 1.0  
-**Last Updated:** March 2026
+- Keep request concurrency low at first because spreadsheet parsing and outbound email sending are synchronous.
+- For a free-tier setup, prefer a single instance and SQLite, understanding that workflow/session data can be lost if Cloud Run stops or replaces the container mid-session.
+- Consider moving the email-sending step to a background job if sends become slow or unreliable.
+- Rotate any credentials that were ever committed to local files.
+- If you add a custom domain, update both `ALLOWED_HOSTS` and `CSRF_TRUSTED_ORIGINS`.

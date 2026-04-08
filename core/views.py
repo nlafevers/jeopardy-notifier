@@ -1,3 +1,5 @@
+import logging
+from django.http import HttpResponse
 from django.shortcuts import render, redirect
 from django.conf import settings
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
@@ -7,6 +9,8 @@ from .services.ranking import rank_employees
 from .services.email import MailgunService
 import pandas as pd
 from io import StringIO
+
+logger = logging.getLogger(__name__)
 
 WORKFLOW_SESSION_KEYS = (
     'ranked_data',
@@ -19,6 +23,11 @@ WORKFLOW_SESSION_KEYS = (
 def clear_workflow_session(request):
     for key in WORKFLOW_SESSION_KEYS:
         request.session.pop(key, None)
+
+
+@require_GET
+def health_view(_request):
+    return HttpResponse('ok', content_type='text/plain')
 
 
 def default_selected_names(ranked_df: pd.DataFrame) -> list[str]:
@@ -50,6 +59,7 @@ def upload_view(request):
                 roster_df = parse_roster(roster_file)
                 ranked_df = rank_employees(hours_df, roster_df, assignment)
             except Exception:
+                logger.exception('Spreadsheet parsing failed')
                 form.add_error(None, 'We could not read one or both spreadsheets. Please confirm the file format and contents.')
                 context = {
                     'form': form,
@@ -201,8 +211,8 @@ def send_emails_view(request):
             
             if success:
                 email_count += 1
-    except Exception as e:
-        print(f"Error sending emails: {str(e)}")
+    except Exception:
+        logger.exception('Unexpected error while sending emails')
         # Continue to confirmation anyway - emails may have been partially sent
     
     # Store email count in session for confirmation page
