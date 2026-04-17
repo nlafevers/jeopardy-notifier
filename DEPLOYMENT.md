@@ -43,6 +43,7 @@ Login to your Google account: `gcloud auth login`
 Set your active project: `gcloud config set project YOUR_PROJECT_ID`
 
 Enable the required APIs:
+
     gcloud services enable run.googleapis.com \
                            cloudbuild.googleapis.com \
                            artifactregistry.googleapis.com \
