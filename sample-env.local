@@ -18,6 +18,8 @@ SECURE_HSTS_SECONDS=0
 SECURE_HSTS_INCLUDE_SUBDOMAINS=false
 SECURE_HSTS_PRELOAD=false
 CSRF_TRUSTED_ORIGINS=
+LOG_LEVEL=INFO
+DATABASE_URL=
 
 # Turnstile test sitekeys
 # Sitekey                   Behavior                      Widget Type  Use case
