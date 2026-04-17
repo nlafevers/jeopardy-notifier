@@ -3,8 +3,6 @@
 DEBUG=true
 SECRET_KEY=django-insecure-dev-key-for-testing
 ALLOWED_HOSTS=localhost,127.0.0.1
-DATABASE_URL=
-LOG_LEVEL=INFO
 MAILGUN_API_KEY=
 MAILGUN_DOMAIN=
 MAILGUN_FROM_EMAIL=no-reply@example.com

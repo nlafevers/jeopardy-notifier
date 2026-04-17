@@ -1,8 +1,6 @@
-# Local Development Setup
+# Jeopardy Notifier TESTING
 
-This guide explains how to run and test Jeopardy Notifier locally after the recent security hardening changes.
-
-Yes, you can still test the app locally. The important difference is that Django now reads:
+This guide explains how to run and test Jeopardy Notifier locally.
 
 - `.env` for shared or deployment-style settings
 - `.env.local` for local overrides
@@ -11,72 +9,39 @@ When both files exist, `.env.local` is loaded after `.env`, so local settings wi
 
 ## Prerequisites
 
-- Python 3.11 or higher
-- Git
-- A spreadsheet app for creating test Excel files
+For local testing it is only necessary to have `python` and `uv` installed.  However, it is possible to use Mailgun and Turnstile from the local testing environment if you have these accounts setup.
 
-## Step 1: Clone and Install
+## Download and Extract
 
-```bash
-git clone https://github.com/YOUR_REPO/jeopardy-notifier.git
-cd jeopardy-notifier
+1. Download the latest release from [Github](https://github.com/nlafevers/jeopardy-notifier/releases)
+2. Extract
+3. `cd jeopardy-notifier-VER/jeopardy-notifier-VER`
+4. `uv sync`
 
-python3 -m venv .venv
-source .venv/bin/activate
+## Create Local Settings
 
-pip install django pandas openpyxl requests python-dotenv gunicorn
-```
+Rename `sample.env.local` to `.env.local`, then adjust the variables as needed.
 
-## Step 2: Create Local Settings
+Keep HTTPS-only settings off locally unless you are explicitly testing them.
+    SECURE_SSL_REDIRECT=false
+    SESSION_COOKIE_SECURE=false
+    CSRF_COOKIE_SECURE=false
+    SECURE_HSTS_SECONDS=0
+    SECURE_HSTS_INCLUDE_SUBDOMAINS=false
+    SECURE_HSTS_PRELOAD=false
+    CSRF_TRUSTED_ORIGINS=
 
-Create `.env.local` in the project root:
+For a short-lived workflow and session data:
+    SESSION_COOKIE_AGE=1800
 
-```bash
-cat > .env.local << EOF
-# Django
-DEBUG=true
-SECRET_KEY=local-development-secret-key-only
-ALLOWED_HOSTS=localhost,127.0.0.1
-
-# Keep HTTPS-only settings off locally unless you are explicitly testing them
-SECURE_SSL_REDIRECT=false
-SESSION_COOKIE_SECURE=false
-CSRF_COOKIE_SECURE=false
-SECURE_HSTS_SECONDS=0
-SECURE_HSTS_INCLUDE_SUBDOMAINS=false
-SECURE_HSTS_PRELOAD=false
-CSRF_TRUSTED_ORIGINS=
-
-# Short-lived workflow/session data
-SESSION_COOKIE_AGE=1800
-
-# Mailgun (optional for local testing)
-MAILGUN_API_KEY=
-MAILGUN_DOMAIN=
-MAILGUN_FROM_EMAIL=noreply@example.com
-
-# Turnstile
-# Option 1: disable locally
-REQUIRE_TURNSTILE=false
-TURNSTILE_SITE_KEY=
-TURNSTILE_SECRET_KEY=
-EOF
-```
+Mailgun and Turnstile are optional for local testing.
 
 Notes:
 
 - If you already have a production-style `.env`, you do not need to remove it. `.env.local` will override it locally.
 - If you want to test Turnstile locally, set `REQUIRE_TURNSTILE=true` and use Cloudflare’s testing keys in `.env.local`.
 
-Example Turnstile local-testing section:
-
-```bash
-REQUIRE_TURNSTILE=true
-TURNSTILE_SITE_KEY=your_turnstile_test_site_key
-TURNSTILE_SECRET_KEY=your_turnstile_test_secret_key
-```
-
-## Step 3: Initialize the Database
+## Initialize the Database
 
 ```bash
 python manage.py migrate
@@ -84,7 +49,7 @@ python manage.py migrate
 
 If you want local behavior to match Cloud Run more closely, set `DATABASE_URL` to a Postgres instance instead of relying on the default SQLite database.
 
-## Step 4: Run the App Locally
+## Run the App Locally
 
 ```bash
 python manage.py runserver
@@ -97,7 +62,7 @@ Open:
 
 With `DEBUG=true`, local testing should work normally without HTTPS redirects.
 
-## Step 5: Run Automated Tests
+## Run Automated Tests
 
 ```bash
 python manage.py test core.tests
@@ -146,24 +111,22 @@ If you do not want real emails sent, leave Mailgun credentials blank and avoid t
 
 The parser expects:
 
-- employee names in column A, starting on row 6
-- assignment names on row 3
-- `HA` markers on row 5 for the assignment-hour columns
-- employee rows ending at the first blank name or `Totals`
+- The assignment names in the third row, each spanning six columns
+- The six quantities being tallied for each assignment on the fifth row
+- One of the quantities being tallied to be `HA` (actual hours)
+- Employee names in the first column starting on row six
 
-Minimal structure:
+The parser will pull actual hours from the designated assignment for each employee until it reaches an empty row in the first column or the word `Totals`
 
-- Row 3: assignment names
-- Row 5: measure labels including `HA`
-- Row 6+: employee rows
+### Roster
 
-### Employee Roster
-
-Use columns:
+The roster must contain exactly these columns in this order:
 
 ```text
 Qgenda Name | Email Name | Email Addresses | FTE
 ```
+
+Multiple email addresses can be listed for each employee separated by commas.
 
 Notes:
 
@@ -195,7 +158,7 @@ Useful scenarios to try:
 
 ## Session and Privacy Behavior in Local Testing
 
-The app now clears workflow session data when a new upload session starts, and browser sessions expire automatically.
+The app clears workflow session data when a new upload session starts, and browser sessions expire automatically.
 
 That means:
 
@@ -236,7 +199,7 @@ Then restart `runserver`.
 Check:
 
 - `REQUIRE_TURNSTILE=true` is set in `.env.local`
-- the testing site key and secret key match
+- the testing site key and secret key are correct
 - the page is loading the current local code
 - your browser devtools show a non-empty `turnstile_response` field at submit time
 
@@ -268,14 +231,3 @@ source .venv/bin/activate
 ```
 
 Then install dependencies again if needed.
-
-## After Local Testing
-
-When you are ready to deploy:
-
-1. keep production values in `.env`
-2. keep local-only overrides in `.env.local`
-3. set a strong random production `SECRET_KEY`
-4. set real `ALLOWED_HOSTS`
-5. set real `CSRF_TRUSTED_ORIGINS` with your public `https://` URLs
-6. enable Turnstile in production with `REQUIRE_TURNSTILE=true`

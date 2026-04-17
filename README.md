@@ -2,17 +2,31 @@
 
 ## Overview
 
-**Jeopardy Notifier** is a Django web application that:
+**Jeopardy Notifier** is a Django web application that ranks employees by hours worked at a particular assignment, divided by FTE, and sends each one a personalized email showing their ranking.  The version 1.2 release is built for direct deployment on a VM.  The version 1.3 release is built for serverless containerized deployment, particularly GCP Cloud Run.
 
-- accepts two Excel spreadsheets
-- ranks employees by hours worked divided by FTE
-- lets a human verify the ranking before sending
-- sends personalized emails through Mailgun
-- clears workflow data after completion
+## Usage
 
-This project now targets **GCP Cloud Run** rather than a long-lived VM.
+The application does not store any data between sessions, so both the report of employee hours, and a roster of employee names, emails, and FTE, must be uploaded with each use.  There is no login required, but Cloudflare Turnstile prevents form submission by bots.  The user is provided a preview of the rankings and may deselect individuals to to either re-rank the rest, or exclude those deselected from receiving emails without re-ranking.  The application is built to use Mailgun for sending emails.  The application does not store data between sessions, and actively clears data if the session appears abandoned or once emails have been sent.
 
-## Architecture Notes for Cloud Run
+## Prerequisites
+
+For local testing it is only necessary to have `python` and `uv` installed.  However, it is possible to use Mailgun and Turnstile from the local testing environment if you have these accounts setup.
+
+For deployment to GCP Cloud Run, the following is needed:
+1. A GCP project with billing enabled
+2. Cloud Run, Cloud Build, and Artifact Registry APIs enabled
+3. A Mailgun account
+4. A Cloudflare Turnstile widget for your domain
+
+## Testing
+
+See TESTING.md for more details on testing the application in a local environment.
+
+## Deployment
+
+See DEPLOYMENT.md for more details on deploying the application to GCP Cloud Run.
+
+## Architecture Notes for Ver 1.3
 
 Cloud Run changes a few assumptions compared with a VM:
 
@@ -23,16 +37,6 @@ Cloud Run changes a few assumptions compared with a VM:
 - Django session data should live in a shared database if you may scale past one instance
 
 This app stores ranking data in the session between requests. For a free-tier, single-instance deployment, it can still run with the default SQLite database inside the container. If `DATABASE_URL` is omitted, the container now runs Django migrations on startup and uses SQLite automatically.
-
-## Prerequisites
-
-Before deploying, prepare:
-
-1. A GCP project with billing enabled
-2. Cloud Run, Cloud Build, Artifact Registry, and Cloud SQL APIs enabled
-3. A Mailgun account
-4. A Cloudflare Turnstile site
-5. `gcloud` installed locally
 
 ## Required Environment Variables
 
@@ -126,26 +130,18 @@ If a revision fails to become healthy, check:
 4. If using `DATABASE_URL`, whether that database is reachable from Cloud Run
 5. If using SQLite, whether startup completed and migrations ran successfully
 
-## Usage
-
-1. Open the app in a browser.
-2. Complete the Turnstile check if enabled.
-3. Upload the hours report and roster spreadsheet.
-4. Review the ranking page.
-5. Update the selected recipients if needed.
-6. Send the emails.
-7. Confirm the completion page appears.
-
 ## Spreadsheet Formats
 
-### Hours report
+### Hours Report
 
 The parser expects:
 
-- employee names in column A starting on row 6
-- assignment names on row 3
-- `HA` markers on row 5 for hour columns
-- rows ending at the first blank name or `Totals`
+- The assignment names in the third row, each spanning six columns
+- The six quantities being tallied for each assignment on the fifth row
+- One of the quantities being tallied to be `HA` (actual hours)
+- Employee names in the first column starting on row six
+
+The parser will pull actual hours from the designated assignment for each employee until it reaches an empty row in the first column or the word `Totals`
 
 ### Roster
 
@@ -154,6 +150,8 @@ The roster must contain exactly these columns in this order:
 ```text
 Qgenda Name | Email Name | Email Addresses | FTE
 ```
+
+Multiple email addresses can be listed for each employee separated by commas.
 
 ## Operational Recommendations
 
