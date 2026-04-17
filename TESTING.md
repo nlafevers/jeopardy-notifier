@@ -23,6 +23,7 @@ For local testing it is only necessary to have `python` and `uv` installed.  How
 Rename `sample.env.local` to `.env.local`, then adjust the variables as needed.
 
 Keep HTTPS-only settings off locally unless you are explicitly testing them.
+
     SECURE_SSL_REDIRECT=false
     SESSION_COOKIE_SECURE=false
     CSRF_COOKIE_SECURE=false
@@ -32,6 +33,7 @@ Keep HTTPS-only settings off locally unless you are explicitly testing them.
     CSRF_TRUSTED_ORIGINS=
 
 For a short-lived workflow and session data:
+
     SESSION_COOKIE_AGE=1800
 
 Mailgun and Turnstile are optional for local testing.
