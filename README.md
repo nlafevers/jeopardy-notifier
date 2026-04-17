@@ -1,8 +1,8 @@
-# Jeopardy Notifier - Cloud Run Deployment & Usage Guide
+# Jeopardy Notifier README
 
 ## Overview
 
-**Jeopardy Notifier** is a Django web application that ranks employees by hours worked at a particular assignment, divided by FTE, and sends each one a personalized email showing their ranking.  The version 1.2 release is built for direct deployment on a VM.  The version 1.3 release is built for serverless containerized deployment, particularly GCP Cloud Run.
+**Jeopardy Notifier** is a Django web application that ranks employees by hours worked at a particular assignment, divided by FTE, and sends each one a personalized email showing their ranking.  The version 1.1 release is built for direct deployment on a VM.  The version 1.2 release is built for serverless containerized deployment, particularly GCP Cloud Run.
 
 ## Usage
 
@@ -26,7 +26,7 @@ See TESTING.md for more details on testing the application in a local environmen
 
 See DEPLOYMENT.md for more details on deploying the application to GCP Cloud Run.
 
-## Architecture Notes for Ver 1.3
+## Architecture Notes for Ver 1.2
 
 Cloud Run changes a few assumptions compared with a VM:
 
@@ -37,98 +37,6 @@ Cloud Run changes a few assumptions compared with a VM:
 - Django session data should live in a shared database if you may scale past one instance
 
 This app stores ranking data in the session between requests. For a free-tier, single-instance deployment, it can still run with the default SQLite database inside the container. If `DATABASE_URL` is omitted, the container now runs Django migrations on startup and uses SQLite automatically.
-
-## Required Environment Variables
-
-Set these for production:
-
-```bash
-DEBUG=false
-SECRET_KEY=replace-me
-ALLOWED_HOSTS=.run.app,your-domain.example
-CSRF_TRUSTED_ORIGINS=https://your-domain.example
-MAILGUN_API_KEY=replace-me
-MAILGUN_DOMAIN=mg.your-domain.example
-MAILGUN_FROM_EMAIL=no-reply@your-domain.example
-TURNSTILE_SITE_KEY=replace-me
-TURNSTILE_SECRET_KEY=replace-me
-REQUIRE_TURNSTILE=true
-LOG_LEVEL=INFO
-```
-
-`DATABASE_URL` is optional. If you leave it unset, the app uses SQLite.
-
-Use Secret Manager for sensitive values like `SECRET_KEY`, `MAILGUN_API_KEY`, and `TURNSTILE_SECRET_KEY`.
-
-## Local Validation
-
-From the repo root:
-
-```bash
-uv sync
-uv run python manage.py migrate
-uv run python manage.py runserver
-```
-
-Open `http://127.0.0.1:8000/`.
-
-## Deploying to Cloud Run
-
-### 1. Build the image
-
-```bash
-gcloud builds submit --tag northamerica-northeast1-docker.pkg.dev/YOUR_PROJECT/YOUR_REPO/jeopardy-notifier
-```
-
-### 2. Choose a database mode
-
-For the lowest-cost deployment, do nothing else here and let the app use SQLite.
-
-If you prefer a persistent shared database, set `DATABASE_URL` and run migrations separately before or alongside deployment:
-
-```bash
-uv run python manage.py migrate
-```
-
-### 3. Deploy the service
-
-For your lowest-cost SQLite deployment, use this as the starting point:
-
-```bash
-gcloud run deploy jeopardy-notifier \
-  --image northamerica-northeast1-docker.pkg.dev/YOUR_PROJECT/YOUR_REPO/jeopardy-notifier \
-  --region northamerica-northeast1 \
-  --allow-unauthenticated \
-  --min-instances 0 \
-  --max-instances 1 \
-  --concurrency 1 \
-  --set-env-vars DEBUG=false,ALLOWED_HOSTS=.run.app,your-domain.example,CSRF_TRUSTED_ORIGINS=https://your-domain.example,MAILGUN_DOMAIN=mg.your-domain.example,MAILGUN_FROM_EMAIL=no-reply@your-domain.example,TURNSTILE_SITE_KEY=replace-me,REQUIRE_TURNSTILE=true,LOG_LEVEL=INFO \
-  --set-secrets SECRET_KEY=django-secret:latest,MAILGUN_API_KEY=mailgun-api-key:latest,TURNSTILE_SECRET_KEY=turnstile-secret:latest
-```
-
-That command intentionally does not set `DATABASE_URL`, so the container will use SQLite and run `migrate` during startup.
-
-The most important SQLite-specific flag here is `--max-instances 1`, which avoids multiple Cloud Run instances each having their own separate local database file.
-
-If you use an external Cloud SQL database, also include:
-
-```bash
---add-cloudsql-instances YOUR_PROJECT:northamerica-northeast1:YOUR_INSTANCE
-```
-
-## Logging and Health Checks
-
-- Application and Django logs are written to stdout/stderr for Cloud Logging.
-- Gunicorn access and error logs are enabled in the container command.
-- A basic health endpoint is available at `/health/`.
-
-If a revision fails to become healthy, check:
-
-1. Cloud Run revision logs
-2. Whether `SECRET_KEY` is set
-3. Whether `ALLOWED_HOSTS` and `CSRF_TRUSTED_ORIGINS` include the active hostname
-4. If using `DATABASE_URL`, whether that database is reachable from Cloud Run
-5. If using SQLite, whether startup completed and migrations ran successfully
 
 ## Spreadsheet Formats
 
