@@ -1,5 +1,7 @@
 # Jeopardy Notifier README
 
+<img width="1166" height="1431" alt="image" src="https://github.com/user-attachments/assets/8edefe67-d808-4b3e-bbb3-eab2a9962aca" />
+
 ## Overview
 
 **Jeopardy Notifier** is a Django web application that ranks employees by hours worked at a particular assignment, divided by FTE, and sends each one a personalized email showing their ranking.  The version 1.1 release is built for direct deployment on a VM.  The version 1.2 release is built for serverless containerized deployment, particularly GCP Cloud Run.
